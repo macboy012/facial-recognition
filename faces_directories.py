@@ -7,6 +7,8 @@ import datetime
 import time
 import glob
 import numpy
+import subprocess
+
 
 cascPath = "haarcascade_frontalface_default.xml"
 faceCascade = cv2.CascadeClassifier(cascPath)
@@ -54,8 +56,10 @@ class FaceCapture(object):
             self.frame_generator = frame_generator
 
         self.draw_wanted_start_frame = -100000
+        self.wake_process = None
 
     def flush_capture_buffer(self):
+        self.end_wakeup()
         if len(self.capture_buffer) < MIN_CAPTURE_FRAMES:
             logging.info("Emptied buffer of %s images without saving" % len(self.capture_buffer))
             self.capture_buffer = []
@@ -71,7 +75,18 @@ class FaceCapture(object):
         self.capture_buffer = []
         self.draw_wanted_start_frame = self.frame_counter
 
+    def wakeup(self):
+        if self.wake_process is None:
+            self.wake_process = subprocess.Popen(["caffeinate", "-u"], shell=True)
+
+    def end_wakeup(self):
+        if self.wake_process is not None:
+            self.wake_process.terminate()
+            self.wake_process.wait()
+            self.wake_process = None
+
     def capture_face(self, face):
+        self.wakeup()
         # If we have nothing to check against, always capture.
         if len(self.capture_buffer) == 0:
             self.capture_buffer.append(face)
@@ -204,7 +219,7 @@ class FaceCapture(object):
             .   it is at the top-left corner.
             """
             if self.draw_wanted_start_frame > self.frame_counter - WANTED_TIME:
-                cv2.putText(frame, "Target identified.", (100,150), cv2.FONT_HERSHEY_DUPLEX, 4.0, (0,0,200), 7)
+                cv2.putText(frame, "Thanks!", (300,150), cv2.FONT_HERSHEY_DUPLEX, 4.0, (0,255,0), 7)
 
 
             # Draw a rectangle around the faces
