@@ -39,6 +39,8 @@ MIN_NEIGHBOURS = 20
 MIN_CAPTURE_FRAMES = 20
 FRAMES_COUNT_TO_SAVE = 20
 
+ACTIVATE_MEAN_DIFF = 8
+
 WANTED_TIME = 60
 
 class FaceCapture(object):
@@ -54,6 +56,8 @@ class FaceCapture(object):
 
         self.draw_wanted_start_frame = -100000
         self.wake_process = None
+        self.last_face_frame = 0
+        self.last_wakeup = 0
 
     def flush_capture_buffer(self):
         self.end_wakeup()
@@ -72,11 +76,18 @@ class FaceCapture(object):
         self.capture_buffer = []
         self.draw_wanted_start_frame = self.frame_counter
 
-    def wakeup(self):
+    def wakeup(self, instant=False):
         if self.wake_process is None:
+            if instant is True and self.last_wakeup+50 > time.time():
+                return
+
             self.wake_process = subprocess.Popen("caffeinate -u", shell=True)
+            if instant is True:
+                time.sleep(0.1)
+                self.end_wakeup()
 
     def end_wakeup(self):
+        self.last_wakeup = time.time()
         if self.wake_process is not None:
             self.wake_process.terminate()
             self.wake_process.wait()
@@ -132,7 +143,6 @@ class FaceCapture(object):
     @staticmethod
     def load_from_request(url):
         while True:
-            st = time.time()
             response = requests.get(url, stream=True)
             filename = "/tmp/tmp_file"
             with open(filename, "wb") as handle:
@@ -141,8 +151,6 @@ class FaceCapture(object):
                         handle.write(chunk)
 
             v = next(FaceCapture.load_from_file(filename))
-            et = time.time()
-            print et-st
             yield v
 
     def run(self):
@@ -154,25 +162,42 @@ class FaceCapture(object):
         process output
         """
 
+        last_mean = 0
+        st = time.time()
+        sframe = 0
         while True:
+            if time.time()-1 > st:
+                st = time.time()
+                #print 'fps', self.frame_counter - sframe
+                sframe = self.frame_counter
+
             self.frame_counter += 1
             frame = next(self.frame_generator)
 
             xMax = frame.shape[1]
             yMax = frame.shape[0]
 
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            print cv2.meanStdDev(gray)
-            capture_area = gray
+            capture_area = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            mean, stddev = cv2.meanStdDev(capture_area)
+            mean = mean[0][0]
+            stddev = stddev[0][0]
 
-            faces = faceCascade.detectMultiScale(
-                capture_area,
-                scaleFactor=1.1,
-                minNeighbors=MIN_NEIGHBOURS,
-                minSize=(30, 30)
-            )
+            if abs(mean-last_mean) > ACTIVATE_MEAN_DIFF:
+                self.wakeup(instant=True)
+
+            last_mean = mean
+
+            faces = []
+            if abs(self.frame_counter - self.last_face_frame) < 20 or self.frame_counter % 5 == 0:
+                faces = faceCascade.detectMultiScale(
+                    capture_area,
+                    scaleFactor=1.1,
+                    minNeighbors=MIN_NEIGHBOURS,
+                    minSize=(30, 30)
+                )
 
             if len(faces) == 1:
+                self.last_face_frame = self.frame_counter
                 face = faces[0]
                 x, y, w, h = face
 
@@ -195,33 +220,9 @@ class FaceCapture(object):
                 if self.frame_counter - self.capture_buffer[-1].frame_counter > MAX_FRAMES_BETWEEN_CAPTURES:
                     self.flush_capture_buffer()
 
-            """
-            putText(img, text, org, fontFace, fontScale, color[, thickness[, lineType[, bottomLeftOrigin]]]) -> img
-            .   @brief Draws a text string.
-            .
-            .   The function cv::putText renders the specified text string in the image. Symbols that cannot be rendered
-            .   using the specified font are replaced by question marks. See #getTextSize for a text rendering code
-            .   example.
-            .
-            .   @param img Image.
-            .   @param text Text string to be drawn.
-            .   @param org Bottom-left corner of the text string in the image.
-            .   @param fontFace Font type, see #HersheyFonts.
-            .   @param fontScale Font scale factor that is multiplied by the font-specific base size.
-            .   @param color Text color.
-            .   @param thickness Thickness of the lines used to draw a text.
-            .   @param lineType Line type. See #LineTypes
-            .   @param bottomLeftOrigin When true, the image data origin is at the bottom-left corner. Otherwise,
-            .   it is at the top-left corner.
-            """
-
-
             # Draw a rectangle around the faces
             for (x, y, w, h) in faces:
                 cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 4)
-                #cv2.fillPoly(frame, numpy.array([[(x, y), (x+w, y), (x, y+h), (x+w, y+h)]], dtype=numpy.int32), (255, 255, 0))
-
-            #frame = cv2.resize(frame, (0,0), fx=0.5, fy=0.5)
 
             # Display the resulting frame
             frame = cv2.flip(frame, flipCode=1)
