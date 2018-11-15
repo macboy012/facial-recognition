@@ -85,10 +85,13 @@ class FaceCapture(object):
             if instant is True:
                 time.sleep(0.1)
                 self.end_wakeup()
+        else:
+            # If we have a process, we're definitely awake.
+            self.last_wakeup = time.time()
 
     def end_wakeup(self):
-        self.last_wakeup = time.time()
         if self.wake_process is not None:
+            self.last_wakeup = time.time()
             self.wake_process.terminate()
             self.wake_process.wait()
             self.wake_process = None
@@ -230,13 +233,16 @@ class FaceCapture(object):
             if self.draw_wanted_start_frame > self.frame_counter - WANTED_TIME:
                 cv2.putText(frame, "Thanks!", (300,150), cv2.FONT_HERSHEY_DUPLEX, 4.0, (0,255,0), 7)
 
-            cv2.imshow('Video', frame)
+            # When the screen goes off, we hang on waitKey, so don't do it if we haven't done a wakeup recently
+            # Also no point in updating the screen if it is off.
+            if self.last_wakeup + 60 > time.time():
+                cv2.imshow('Video', frame)
 
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
 
-            # Display the resulting frame
-            cv2.imshow('Video', frame)
+                # Display the resulting frame
+                cv2.imshow('Video', frame)
 
 def get_frames():
     files = glob.glob("/Users/mackenzie/frontdoor/20*/*.jpg")
