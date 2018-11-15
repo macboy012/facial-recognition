@@ -39,9 +39,6 @@ MIN_NEIGHBOURS = 20
 MIN_CAPTURE_FRAMES = 20
 FRAMES_COUNT_TO_SAVE = 20
 
-CAPTURE_AREA_XY1 = (600, 500)
-CAPTURE_AREA_XY2 = (1000, 1000)
-
 WANTED_TIME = 60
 
 class FaceCapture(object):
@@ -77,7 +74,7 @@ class FaceCapture(object):
 
     def wakeup(self):
         if self.wake_process is None:
-            self.wake_process = subprocess.Popen(["caffeinate", "-u"], shell=True)
+            self.wake_process = subprocess.Popen("caffeinate -u", shell=True)
 
     def end_wakeup(self):
         if self.wake_process is not None:
@@ -165,8 +162,7 @@ class FaceCapture(object):
             yMax = frame.shape[0]
 
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            #print CAPTURE_AREA_XY1[1],CAPTURE_AREA_XY2[1], CAPTURE_AREA_XY1[0],CAPTURE_AREA_XY2[0]
-            #capture_area = gray[CAPTURE_AREA_XY1[1]:CAPTURE_AREA_XY2[1], CAPTURE_AREA_XY1[0]:CAPTURE_AREA_XY2[0]]
+            print cv2.meanStdDev(gray)
             capture_area = gray
 
             faces = faceCascade.detectMultiScale(
@@ -218,21 +214,21 @@ class FaceCapture(object):
             .   @param bottomLeftOrigin When true, the image data origin is at the bottom-left corner. Otherwise,
             .   it is at the top-left corner.
             """
-            if self.draw_wanted_start_frame > self.frame_counter - WANTED_TIME:
-                cv2.putText(frame, "Thanks!", (300,150), cv2.FONT_HERSHEY_DUPLEX, 4.0, (0,255,0), 7)
 
 
             # Draw a rectangle around the faces
             for (x, y, w, h) in faces:
-                #x += CAPTURE_AREA_XY1[0]
-                #y += CAPTURE_AREA_XY1[1]
                 cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 4)
                 #cv2.fillPoly(frame, numpy.array([[(x, y), (x+w, y), (x, y+h), (x+w, y+h)]], dtype=numpy.int32), (255, 255, 0))
 
-            #cv2.rectangle(frame, CAPTURE_AREA_XY1, CAPTURE_AREA_XY2, (255, 255, 0), 2)
             #frame = cv2.resize(frame, (0,0), fx=0.5, fy=0.5)
 
             # Display the resulting frame
+            frame = cv2.flip(frame, flipCode=1)
+
+            if self.draw_wanted_start_frame > self.frame_counter - WANTED_TIME:
+                cv2.putText(frame, "Thanks!", (300,150), cv2.FONT_HERSHEY_DUPLEX, 4.0, (0,255,0), 7)
+
             cv2.imshow('Video', frame)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
