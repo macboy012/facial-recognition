@@ -234,7 +234,7 @@ class FaceCapture(object):
 
             # When the screen goes off, we hang on waitKey, so don't do it if we haven't done a wakeup recently
             # Also no point in updating the screen if it is off.
-            if self.last_wakeup + 60 > time.time():
+            if self.last_wakeup + 40 > time.time():
                 cv2.imshow('Video', frame)
 
                 if cv2.waitKey(1) & 0xFF == ord('q'):
