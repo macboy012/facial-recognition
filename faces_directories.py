@@ -224,13 +224,13 @@ class FaceCapture(object):
 
             # Draw a rectangle around the faces
             for (x, y, w, h) in faces:
-                cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 0, 0), 4)
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 4)
 
             # Display the resulting frame
             frame = cv2.flip(frame, flipCode=1)
 
             if self.draw_wanted_start_frame > self.frame_counter - TEXT_DISPLAY_TIME:
-                cv2.putText(frame, "Thanks!", (300,150), cv2.FONT_HERSHEY_DUPLEX, 4.0, (0,0,0), 7)
+                cv2.putText(frame, "Thanks!", (300,150), cv2.FONT_HERSHEY_DUPLEX, 4.0, (255,0,0), 7)
 
             # When the screen goes off, we hang on waitKey, so don't do it if we haven't done a wakeup recently
             # Also no point in updating the screen if it is off.
