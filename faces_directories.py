@@ -41,7 +41,7 @@ FRAMES_COUNT_TO_SAVE = 20
 
 ACTIVATE_MEAN_DIFF = 8
 
-WANTED_TIME = 60
+TEXT_DISPLAY_TIME = 60
 
 class FaceCapture(object):
     def __init__(self, video_capture, frame_generator=None):
@@ -76,15 +76,14 @@ class FaceCapture(object):
         self.capture_buffer = []
         self.draw_wanted_start_frame = self.frame_counter
 
-    def wakeup(self, instant=False):
+    def wakeup(self):
         if self.wake_process is None:
-            if instant is True and self.last_wakeup+50 > time.time():
+            if self.last_wakeup+30 > time.time():
                 return
 
             self.wake_process = subprocess.Popen("caffeinate -u", shell=True)
-            if instant is True:
-                time.sleep(0.1)
-                self.end_wakeup()
+            time.sleep(0.1)
+            self.end_wakeup()
         else:
             # If we have a process, we're definitely awake.
             self.last_wakeup = time.time()
@@ -186,7 +185,7 @@ class FaceCapture(object):
             stddev = stddev[0][0]
 
             if abs(mean-last_mean) > ACTIVATE_MEAN_DIFF:
-                self.wakeup(instant=True)
+                self.wakeup()
 
             last_mean = mean
 
@@ -225,13 +224,13 @@ class FaceCapture(object):
 
             # Draw a rectangle around the faces
             for (x, y, w, h) in faces:
-                cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 4)
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 0, 0), 4)
 
             # Display the resulting frame
             frame = cv2.flip(frame, flipCode=1)
 
-            if self.draw_wanted_start_frame > self.frame_counter - WANTED_TIME:
-                cv2.putText(frame, "Thanks!", (300,150), cv2.FONT_HERSHEY_DUPLEX, 4.0, (0,255,0), 7)
+            if self.draw_wanted_start_frame > self.frame_counter - TEXT_DISPLAY_TIME:
+                cv2.putText(frame, "Thanks!", (300,150), cv2.FONT_HERSHEY_DUPLEX, 4.0, (0,0,0), 7)
 
             # When the screen goes off, we hang on waitKey, so don't do it if we haven't done a wakeup recently
             # Also no point in updating the screen if it is off.
