@@ -232,7 +232,7 @@ class FaceCapture(object):
             frame = cv2.flip(frame, flipCode=1)
 
             if self.draw_wanted_start_frame > self.frame_counter - TEXT_DISPLAY_TIME:
-                cv2.putText(frame, "Thanks!", (300,150), cv2.FONT_HERSHEY_DUPLEX, 8.0, DRAWING_COLOR, 14)
+                cv2.putText(frame, "Thanks!", (150,250), cv2.FONT_HERSHEY_DUPLEX, 8.0, DRAWING_COLOR, 14)
 
             # When the screen goes off, we hang on waitKey, so don't do it if we haven't done a wakeup recently
             # Also no point in updating the screen if it is off.
