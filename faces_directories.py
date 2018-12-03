@@ -1,4 +1,5 @@
 import cv2
+import json
 import os
 import sys
 import logging
@@ -8,11 +9,13 @@ import time
 import glob
 import numpy
 import subprocess
+from collections import defaultdict
+
+import utils
 
 
 cascPath = "haarcascade_frontalface_default.xml"
 faceCascade = cv2.CascadeClassifier(cascPath)
-#logging.basicConfig(filename='webcam.log',level=log.INFO)
 logging.basicConfig(level=logging.INFO)
 
 anterior = 0
@@ -45,11 +48,26 @@ TEXT_DISPLAY_TIME = 60
 
 DRAWING_COLOR = (100,0,255)
 
+face_recognizer, labels = utils.load_model()
+
+def try_label(face):
+    refined = utils.refine_image(face.face_frame)
+    if refined is None:
+        return None
+    label, confidence = face_recognizer.predict(refined)
+    if confidence > 20:
+        return None
+    #print labels[label], confidence
+    return labels[label]
+
 class FaceCapture(object):
     def __init__(self, video_capture, frame_generator=None):
         self.video_capture = video_capture
         self.in_capture = False
         self.capture_buffer = []
+
+        self.recognition = defaultdict(int)
+
         self.frame_counter = 0
         if frame_generator is None:
             self.frame_generator = self.load_from_webcam()
@@ -60,6 +78,7 @@ class FaceCapture(object):
         self.wake_process = None
         self.last_face_frame = 0
         self.last_wakeup = 0
+        self.thank_person = None
 
     def flush_capture_buffer(self):
         self.end_wakeup()
@@ -75,8 +94,15 @@ class FaceCapture(object):
             cv2.imwrite(file_path, capture.face_frame)
         logging.info("Wrote buffer of %s images to %s" % (len(self.capture_buffer), our_dir))
 
+        name = None
+        for person, count in self.recognition.items():
+            if count > 10:
+                name = person
+
         self.capture_buffer = []
+        self.recognition.clear()
         self.draw_wanted_start_frame = self.frame_counter
+        self.thank_person = name
 
     def wakeup(self):
         if self.wake_process is None:
@@ -125,6 +151,11 @@ class FaceCapture(object):
         if y < y_min or y > y_max:
             logging.info("Y %s outside allowable %s - %s" % (y, y_min, y_max))
             return
+
+        found = try_label(face)
+        if found is not None:
+            print found
+            self.recognition[found] += 1
 
         self.capture_buffer.append(face)
 
@@ -233,6 +264,8 @@ class FaceCapture(object):
 
             if self.draw_wanted_start_frame > self.frame_counter - TEXT_DISPLAY_TIME:
                 cv2.putText(frame, "Thanks!", (150,250), cv2.FONT_HERSHEY_DUPLEX, 8.0, DRAWING_COLOR, 14)
+                if self.thank_person is not None:
+                    cv2.putText(frame, self.thank_person, (150,450), cv2.FONT_HERSHEY_DUPLEX, 6.0, DRAWING_COLOR, 12)
 
             # When the screen goes off, we hang on waitKey, so don't do it if we haven't done a wakeup recently
             # Also no point in updating the screen if it is off.
