@@ -78,11 +78,18 @@ class FaceCapture(object):
         self.last_wakeup = 0
         self.thank_person = None
 
+        self.found_people = defaultdict(int)
+
+        self.match_data = utils.read_match_data()
+
+        self.names, self.face_encodings = utils.get_faces_names_lists(self.match_data)
+
     def flush_capture_buffer(self):
         self.end_wakeup()
         if len(self.capture_buffer) < MIN_CAPTURE_FRAMES:
             logging.info("Emptied buffer of %s images without saving" % len(self.capture_buffer))
             self.capture_buffer = []
+            self.found_people.clear()
             return
 
         our_dir = os.path.join(FACE_CAPTURE_DIRECTORY, self.capture_buffer[0].timestamp.strftime("%Y-%m-%d_%H-%M-%S"))
@@ -94,7 +101,16 @@ class FaceCapture(object):
 
         self.capture_buffer = []
         self.draw_wanted_start_frame = self.frame_counter
-        self.thank_person = None
+
+        max_hits = 0
+        max_person = None
+        for person, hits in self.found_people.items():
+            if hits > max_hits:
+                max_person = person
+                max_hits = hits
+
+        self.thank_person = max_person
+        self.found_people.clear()
 
     def wakeup(self):
         if self.wake_process is None:
@@ -248,6 +264,10 @@ class FaceCapture(object):
 
                 face_obj = Face(face, colour_face, self.frame_counter)
                 self.capture_face(face_obj)
+
+                people = utils.get_identified_people(colour_face, self.face_encodings, self.names)
+                for name, count in people.items():
+                    self.found_people[name] += count
 
             # do flush if we have enough frames
             if len(self.capture_buffer) >= FRAMES_COUNT_TO_SAVE:

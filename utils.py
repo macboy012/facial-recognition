@@ -7,6 +7,7 @@ from collections import defaultdict
 import dlib
 from imutils import face_utils
 import imutils
+import face_recognition
 
 MODEL_SAVE_LOCATION = "model"
 MODEL_BIN_FILE = "face_recognition.bin"
@@ -192,5 +193,59 @@ def calculate_eye_jaw_sides_ratio(shape):
     jaw_eye_ratio = (right_avg[0]-right_jaw[0])/(left_jaw[0]-left_avg[0])
 
     return jaw_eye_ratio
+
+MATCH_DATA_DIR = "match_data"
+def read_match_data():
+    all_data = {}
+    for dir_name in os.listdir(MATCH_DATA_DIR):
+        full_dir = os.path.join(MATCH_DATA_DIR, dir_name)
+        if os.path.isdir(full_dir):
+            names = os.listdir(full_dir)
+            if 'info.json' in names:
+                with open(os.path.join(full_dir, "info.json"), 'r') as f:
+                    info = json.load(f)
+                assert info['name'] not in all_data
+                all_data[info['name']] = info
+                info['imgs'] = []
+                info['encodings'] = []
+                for name in names:
+                    if name.endswith(".png") or name.endswith(".jpg"):
+                        fullname = os.path.join(full_dir, name)
+                        #img = cv2.imread(fullname, 1) # would load as BGR which isn't what we want.
+                        img = face_recognition.load_image_file(fullname)
+                        face_encoding = face_recognition.face_encodings(img, num_jitters=100)[0]
+                        info['imgs'].append(img)
+                        info['encodings'].append(face_encoding)
+
+    return all_data
+
+def get_faces_names_lists(all_data):
+    names = []
+    encoded_faces = []
+    for name, person in all_data.items():
+        for ef in person['encodings']:
+            names.append(name)
+            encoded_faces.append(ef)
+    return names, encoded_faces
+
+
+def get_identified_people(cv2_img, known_faces, names):
+
+    # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
+    rgb_frame = cv2_img[:, :, ::-1]
+
+    # Find all the faces and face enqcodings in the frame of video
+    face_locations = face_recognition.face_locations(rgb_frame)
+    face_encoding = face_recognition.face_encodings(rgb_frame, face_locations, num_jitters=10)[0]
+
+    matches = face_recognition.compare_faces(known_faces, face_encoding)
+
+    hits = defaultdict(int)
+    for match, name in zip(matches, names):
+        # FML that 'match' is a numpy bool, not 'is True'
+        if match == True:
+            hits[name] += 1
+
+    return hits
 
 
