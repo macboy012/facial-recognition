@@ -7,7 +7,7 @@ import requests
 import datetime
 import time
 import glob
-import numpy
+import numpy as np
 import subprocess
 from collections import defaultdict
 
@@ -39,8 +39,8 @@ X_DIFF_PERCENT = 0.2
 Y_DIFF_PERCENT = 0.2
 MIN_NEIGHBOURS = 20
 
-MIN_CAPTURE_FRAMES = 20
-FRAMES_COUNT_TO_SAVE = 20
+MIN_CAPTURE_FRAMES = 10
+FRAMES_COUNT_TO_SAVE = 10
 
 ACTIVATE_MEAN_DIFF = 8
 
@@ -65,8 +65,6 @@ class FaceCapture(object):
         self.video_capture = video_capture
         self.in_capture = False
         self.capture_buffer = []
-
-        self.recognition = defaultdict(int)
 
         self.frame_counter = 0
         if frame_generator is None:
@@ -94,15 +92,9 @@ class FaceCapture(object):
             cv2.imwrite(file_path, capture.face_frame)
         logging.info("Wrote buffer of %s images to %s" % (len(self.capture_buffer), our_dir))
 
-        name = None
-        for person, count in self.recognition.items():
-            if count > 10:
-                name = person
-
         self.capture_buffer = []
-        self.recognition.clear()
         self.draw_wanted_start_frame = self.frame_counter
-        self.thank_person = name
+        self.thank_person = None
 
     def wakeup(self):
         if self.wake_process is None:
@@ -151,11 +143,6 @@ class FaceCapture(object):
         if y < y_min or y > y_max:
             logging.info("Y %s outside allowable %s - %s" % (y, y_min, y_max))
             return
-
-        found = try_label(face)
-        if found is not None:
-            print found
-            self.recognition[found] += 1
 
         self.capture_buffer.append(face)
 
@@ -241,9 +228,25 @@ class FaceCapture(object):
                 y1 = y
                 y2 = y+h
 
-                gray_face = capture_area[y1:y2, x1:x2]
+                # expand_area
+                width_plus = int(w/4.0)
+                height_plus = int(h/4.0)
+                x1 -= width_plus
+                x2 += width_plus
+                y1 -= height_plus
+                y2 += height_plus
 
-                face_obj = Face(face, gray_face, self.frame_counter)
+                y_max, x_max = frame.shape[:2]
+
+                x1 = max(0, x1)
+                y1 = max(0, y1)
+                x2 = min(x_max, x2)
+                y2 = min(y_max, y2)
+
+                colour_face = frame[y1:y2, x1:x2]
+                colour_face = np.copy(colour_face)
+
+                face_obj = Face(face, colour_face, self.frame_counter)
                 self.capture_face(face_obj)
 
             # do flush if we have enough frames
