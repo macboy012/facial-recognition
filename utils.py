@@ -26,7 +26,57 @@ def load_model():
         labels = json.load(f)
     return recognizer, labels
 
-def get_names_faces_dict(directory):
+def refine_image(image):
+    x_len, y_len = image.shape[:2]
+    image_rect = dlib.rectangle(left=0, top=0, right=x_len, bottom=y_len)
+
+    image_shape = image.shape
+    shape = FEATURE_PREDICTOR(image, image_rect)
+    shape = face_utils.shape_to_np(shape)
+
+    left_avg = get_feature_average(shape, "left_eye")
+    right_avg = get_feature_average(shape, "right_eye")
+
+    eye_difference  = right_avg - left_avg
+    rads = math.atan(eye_difference[1]/eye_difference[0])
+    degrees = math.degrees(rads)
+
+    orig_dims = image.shape[0:2]
+    rot_image = imutils.rotate(image, degrees)
+
+    new_dims = rot_image.shape[:2]
+
+    rot_shape = translate_rotation(orig_dims, new_dims, degrees, shape)
+    rot_shape = numpy.array([(int(x[0]), int(x[1])) for x in rot_shape])
+
+    jaw_eye_ratio = calculate_eye_jaw_sides_ratio(rot_shape)
+    if abs(1-jaw_eye_ratio) > 0.15:
+        return None
+
+    first, last = face_utils.FACIAL_LANDMARKS_IDXS["jaw"]
+    jaw = rot_shape[first:last]
+    left_jaw = jaw[0]
+    right_jaw = jaw[-1]
+
+    max_right = rot_image.shape[1]
+    max_down = rot_image.shape[1]
+
+    max_down = min(max_down, max([y for x, y in jaw]))
+
+    first, last = face_utils.FACIAL_LANDMARKS_IDXS["left_eyebrow"]
+    top_most = min([x[1] for x in rot_shape[first:last]])
+    first, last = face_utils.FACIAL_LANDMARKS_IDXS["right_eyebrow"]
+    top_most2 = min([x[1] for x in rot_shape[first:last]])
+
+    left =  max(int(left_jaw[0]), 0)
+    right = min(int(right_jaw[0]), max_right)
+    top = min(top_most, top_most2)
+    bottom = max_down
+    final = rot_image[top:bottom, left:right]
+
+    return final
+
+def get_names_faces_dict(directory, preprocessor=refine_image):
     name_face_map = defaultdict(list)
     for dir_name in os.listdir(directory):
         full_dir = os.path.join(directory, dir_name)
@@ -45,12 +95,8 @@ def get_names_faces_dict(directory):
                     if img is None:
                         print 'img was none'
                         continue
-                    refined = refine_image(img)
-                    if refined is None:
-                        'rejected'
-                        continue
-                    name_face_map[label].append(img)
-                    assert img is not None, fullname
+                    refined = preprocessor(img)
+                    name_face_map[label].append(refined)
     return name_face_map
 
 def format_table(stats):
@@ -117,55 +163,12 @@ def translate_rotation(original_dims, new_dims, rotation, coordinates):
 
 FEATURE_PREDICTOR = dlib.shape_predictor('shape_predictor_68_face_landmarks.dat')
 
-def refine_image(image):
+def to_face_landmarks(image):
     x_len, y_len = image.shape[:2]
     image_rect = dlib.rectangle(left=0, top=0, right=x_len, bottom=y_len)
-
-    image_shape = image.shape
     shape = FEATURE_PREDICTOR(image, image_rect)
     shape = face_utils.shape_to_np(shape)
-
-    left_avg = get_feature_average(shape, "left_eye")
-    right_avg = get_feature_average(shape, "right_eye")
-
-    eye_difference  = right_avg - left_avg
-    rads = math.atan(eye_difference[1]/eye_difference[0])
-    degrees = math.degrees(rads)
-
-    orig_dims = image.shape[0:2]
-    rot_image = imutils.rotate(image, degrees)
-
-    new_dims = rot_image.shape[:2]
-
-    rot_shape = translate_rotation(orig_dims, new_dims, degrees, shape)
-    rot_shape = numpy.array([(int(x[0]), int(x[1])) for x in rot_shape])
-
-    jaw_eye_ratio = calculate_eye_jaw_sides_ratio(rot_shape)
-    if abs(1-jaw_eye_ratio) > 0.15:
-        return None
-
-    first, last = face_utils.FACIAL_LANDMARKS_IDXS["jaw"]
-    jaw = rot_shape[first:last]
-    left_jaw = jaw[0]
-    right_jaw = jaw[-1]
-
-    max_right = rot_image.shape[1]
-    max_down = rot_image.shape[1]
-
-    max_down = min(max_down, max([y for x, y in jaw]))
-
-    first, last = face_utils.FACIAL_LANDMARKS_IDXS["left_eyebrow"]
-    top_most = min([x[1] for x in rot_shape[first:last]])
-    first, last = face_utils.FACIAL_LANDMARKS_IDXS["right_eyebrow"]
-    top_most2 = min([x[1] for x in rot_shape[first:last]])
-
-    left =  max(int(left_jaw[0]), 0)
-    right = min(int(right_jaw[0]), max_right)
-    top = min(top_most, top_most2)
-    bottom = max_down
-    final = rot_image[top:bottom, left:right]
-
-    return final
+    return image, shape
 
 def get_feature_average(shape, feature_name):
     i, j = face_utils.FACIAL_LANDMARKS_IDXS[feature_name]
