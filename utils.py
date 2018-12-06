@@ -236,8 +236,10 @@ def get_identified_people(cv2_img, known_faces, names):
 
     # Find all the faces and face enqcodings in the frame of video
     face_locations = face_recognition.face_locations(rgb_frame)
-    face_encoding = face_recognition.face_encodings(rgb_frame, face_locations, num_jitters=10)[0]
-
+    face_encodings = face_recognition.face_encodings(rgb_frame, face_locations, num_jitters=10)
+    if len(face_encodings) == 0:
+        return {}
+    face_encoding = face_encodings[0]
     matches = face_recognition.compare_faces(known_faces, face_encoding)
 
     hits = defaultdict(int)
