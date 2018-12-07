@@ -131,7 +131,8 @@ def format_graph(stats):
     graph = "\n".join(graph)
     graph_stats = {}
     for key, val in stats.items():
-        graph_stats[key] = "#"*val
+        if len(key) == 2:
+            graph_stats[key] = "#"*val
 
     return graph.format(**graph_stats)
 
@@ -219,7 +220,7 @@ def read_match_data():
 
     return all_data
 
-def get_faces_names_lists(all_data):
+def get_names_faces_lists(all_data):
     names = []
     encoded_faces = []
     for name, person in all_data.items():
@@ -250,4 +251,66 @@ def get_identified_people(cv2_img, known_faces, names):
 
     return hits
 
+import time
+#times = {
+#    'loc': 0,
+#    'enc': 0,
+#    'dis': 0,
+#}
+def test_data_stuff(cv2_img, known_faces):
+    # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
+    rgb_frame = cv2_img[:, :, ::-1]
+
+    # Find all the faces and face enqcodings in the frame of video
+    #t1 = time.time()
+    face_locations = face_recognition.face_locations(rgb_frame)
+    #t2 = time.time()
+    # ugh stuck here
+    #times['loc'] += t2-t1
+    face_encodings = face_recognition.face_encodings(rgb_frame, face_locations, num_jitters=10)
+    #t3 = time.time()
+    #times['enc'] += t3-t2
+    if len(face_encodings) == 0:
+        return None
+    face_encoding = face_encodings[0]
+
+    #... distance.
+    #matches = face_recognition.compare_faces(known_faces, face_encoding)
+    distances = face_recognition.face_distance(known_faces, face_encoding)
+    #t4 = time.time()
+    #times['dis'] += t4-t3
+    return distances
+
+    #hits = defaultdict(int)
+    #for match, name in zip(matches, names):
+        # FML that 'match' is a numpy bool, not 'is True'
+        #if match == True:
+            #hits[name] += 1
+
+    #return hits
+
+TOLERANCE = 0.35
+def get_best_match(cv2_img, known_faces, names):
+    distances = test_data_stuff(cv2_img, known_faces)
+    if distances is None:
+        return None
+
+    min_dist = 1
+    use_name = None
+    for name, dist in zip(names, distances):
+        if dist < min_dist:
+            min_dist = dist
+            use_name = name
+
+
+    if min_dist > TOLERANCE:
+        return None
+    else:
+        return use_name
+
+
+#import atexit
+#@atexit.register
+#def printit():
+#    print times
 

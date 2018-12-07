@@ -9,9 +9,10 @@ import time
 import glob
 import numpy as np
 import subprocess
-from collections import defaultdict
+from collections import defaultdict, deque
 
 import utils
+from multiprocessing import Pool, TimeoutError
 
 
 cascPath = "haarcascade_frontalface_default.xml"
@@ -48,17 +49,12 @@ TEXT_DISPLAY_TIME = 60
 
 DRAWING_COLOR = (100,0,255)
 
-face_recognizer, labels = utils.load_model()
 
-def try_label(face):
-    refined = utils.refine_image(face.face_frame)
-    if refined is None:
-        return None
-    label, confidence = face_recognizer.predict(refined)
-    if confidence > 20:
-        return None
-    #print labels[label], confidence
-    return labels[label]
+MATCH_DATA = utils.read_match_data()
+NAMES, FACE_ENCODINGS = utils.get_names_faces_lists(MATCH_DATA)
+def get_best_match(cv2_img):
+    match_person = utils.get_best_match(cv2_img, FACE_ENCODINGS, NAMES)
+    return match_person
 
 class FaceCapture(object):
     def __init__(self, video_capture, frame_generator=None):
@@ -80,9 +76,8 @@ class FaceCapture(object):
 
         self.found_people = defaultdict(int)
 
-        self.match_data = utils.read_match_data()
-
-        self.names, self.face_encodings = utils.get_faces_names_lists(self.match_data)
+        self.pool = Pool(processes=2)
+        self.pool_results = deque()
 
     def flush_capture_buffer(self):
         self.end_wakeup()
@@ -109,7 +104,9 @@ class FaceCapture(object):
                 max_person = person
                 max_hits = hits
 
-        self.thank_person = max_person
+        if max_hits > 5:
+            self.thank_person = max_person
+
         self.found_people.clear()
 
     def wakeup(self):
@@ -265,9 +262,30 @@ class FaceCapture(object):
                 face_obj = Face(face, colour_face, self.frame_counter)
                 self.capture_face(face_obj)
 
-                people = utils.get_identified_people(colour_face, self.face_encodings, self.names)
-                for name, count in people.items():
-                    self.found_people[name] += count
+                #st = time.time()
+                bm = get_best_match(colour_face)
+                match_person = bm
+                if match_person is not None:
+                    self.found_people[match_person] += 1
+
+
+                #et = time.time()
+                #print et-st
+                #result = self.pool.apply_async(get_best_match, (colour_face,))
+                #self.pool_results.append(result)
+
+            if len(self.pool_results) > 0:
+                print len(self.pool_results)
+                res = self.pool_results[0]
+                try:
+                    match_person = res.get()
+                    print 'match here', match_person
+                except TimeoutError:
+                    pass
+                else:
+                    self.pool_results.popleft()
+                    if match_person is not None:
+                        self.found_people[match_person] += 1
 
             # do flush if we have enough frames
             if len(self.capture_buffer) >= FRAMES_COUNT_TO_SAVE:
