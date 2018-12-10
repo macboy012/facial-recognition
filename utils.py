@@ -1,6 +1,6 @@
 import os
 import json
-import numpy
+import numpy as np
 import math
 import cv2
 from collections import defaultdict
@@ -48,7 +48,7 @@ def refine_image(image):
     new_dims = rot_image.shape[:2]
 
     rot_shape = translate_rotation(orig_dims, new_dims, degrees, shape)
-    rot_shape = numpy.array([(int(x[0]), int(x[1])) for x in rot_shape])
+    rot_shape = np.array([(int(x[0]), int(x[1])) for x in rot_shape])
 
     jaw_eye_ratio = calculate_eye_jaw_sides_ratio(rot_shape)
     if abs(1-jaw_eye_ratio) > 0.15:
@@ -151,15 +151,15 @@ def translate_to_topleft_relative(dims, coordinate):
     return (coordinate[0]+x_c, coordinate[1]+y_c)
 
 def translate_rotation(original_dims, new_dims, rotation, coordinates):
-    cr_coordinates = numpy.array([translate_to_center_relative(original_dims, coordinate) for coordinate in coordinates])
+    cr_coordinates = np.array([translate_to_center_relative(original_dims, coordinate) for coordinate in coordinates])
 
-    theta = numpy.radians(rotation)
-    c, s = numpy.cos(theta), numpy.sin(theta)
-    R = numpy.array(((c, -s), (s, c)))
+    theta = np.radians(rotation)
+    c, s = np.cos(theta), np.sin(theta)
+    R = np.array(((c, -s), (s, c)))
 
-    rot_coordiantes = numpy.matmul(cr_coordinates, R)
+    rot_coordiantes = np.matmul(cr_coordinates, R)
 
-    not_cr_coordinates = numpy.array([translate_to_topleft_relative(new_dims, coord) for coord in rot_coordiantes])
+    not_cr_coordinates = np.array([translate_to_topleft_relative(new_dims, coord) for coord in rot_coordiantes])
 
     return not_cr_coordinates
 
@@ -201,24 +201,46 @@ def read_match_data():
     for dir_name in os.listdir(MATCH_DATA_DIR):
         full_dir = os.path.join(MATCH_DATA_DIR, dir_name)
         if os.path.isdir(full_dir):
-            names = os.listdir(full_dir)
-            if 'info.json' in names:
-                with open(os.path.join(full_dir, "info.json"), 'r') as f:
-                    info = json.load(f)
-                assert info['name'] not in all_data
-                all_data[info['name']] = info
-                info['imgs'] = []
-                info['encodings'] = []
-                for name in names:
-                    if name.endswith(".png") or name.endswith(".jpg"):
-                        fullname = os.path.join(full_dir, name)
-                        #img = cv2.imread(fullname, 1) # would load as BGR which isn't what we want.
-                        img = face_recognition.load_image_file(fullname)
-                        face_encoding = face_recognition.face_encodings(img, num_jitters=100)[0]
-                        info['imgs'].append(img)
-                        info['encodings'].append(face_encoding)
+            person_info = load_person(full_dir)
+            assert person_info['name'] not in all_data
+            all_data[person_info['name']] = person_info
 
     return all_data
+
+def load_person(directory):
+    file_names = os.listdir(directory)
+    assert 'info.json' in file_names
+    with open(os.path.join(directory, "info.json"), 'r') as f:
+        info = json.load(f)
+    info['encodings'] = []
+    for name in file_names:
+        if name.endswith(".png") or name.endswith(".jpg"):
+            encoding = load_and_cache_encoding(directory, name[:-4])
+            info['encodings'].append(encoding)
+    return info
+
+def load_and_cache_encoding(directory, prefix):
+    bin_file = os.path.join(directory, prefix)
+    if os.path.isfile(bin_file + ".npy"):
+        encoding = np.load(bin_file + ".npy")
+    else:
+        if os.path.isfile(os.path.join(directory, prefix + ".png")):
+            encoding = compute_image_encoding(directory, prefix + ".png")
+        else:
+            encoding = compute_image_encoding(directory, prefix + ".jpg")
+        np.save(bin_file, encoding)
+    return encoding
+
+def compute_image_encoding(directory, filename):
+    """
+    Assumes it will receive an image with a single face in it.
+    No more, no less.
+    """
+    fullname = os.path.join(directory, filename)
+    img = face_recognition.load_image_file(fullname)
+    face_encoding = face_recognition.face_encodings(img, num_jitters=100)[0]
+    return face_encoding
+
 
 def get_names_faces_lists(all_data):
     names = []
@@ -245,7 +267,7 @@ def get_identified_people(cv2_img, known_faces, names):
 
     hits = defaultdict(int)
     for match, name in zip(matches, names):
-        # FML that 'match' is a numpy bool, not 'is True'
+        # FML that 'match' is a np bool, not 'is True'
         if match == True:
             hits[name] += 1
 
@@ -283,7 +305,7 @@ def test_data_stuff(cv2_img, known_faces):
 
     #hits = defaultdict(int)
     #for match, name in zip(matches, names):
-        # FML that 'match' is a numpy bool, not 'is True'
+        # FML that 'match' is a np bool, not 'is True'
         #if match == True:
             #hits[name] += 1
 
@@ -307,10 +329,4 @@ def get_best_match(cv2_img, known_faces, names):
         return None
     else:
         return use_name
-
-
-#import atexit
-#@atexit.register
-#def printit():
-#    print times
 
