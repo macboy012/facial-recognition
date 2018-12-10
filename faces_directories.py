@@ -85,6 +85,7 @@ class FaceCapture(object):
             logging.info("Emptied buffer of %s images without saving" % len(self.capture_buffer))
             self.capture_buffer = []
             self.found_people.clear()
+            self.thank_person = None
             return
 
         our_dir = os.path.join(FACE_CAPTURE_DIRECTORY, self.capture_buffer[0].timestamp.strftime("%Y-%m-%d_%H-%M-%S"))
@@ -104,6 +105,7 @@ class FaceCapture(object):
                 max_person = person
                 max_hits = hits
 
+        self.thank_person = None
         if max_hits > 5:
             self.thank_person = max_person
 
