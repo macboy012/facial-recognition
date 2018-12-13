@@ -9,97 +9,6 @@ from imutils import face_utils
 import imutils
 import face_recognition
 
-MODEL_SAVE_LOCATION = "model"
-MODEL_BIN_FILE = "face_recognition.bin"
-MODEL_LABEL_FILE = "face_recognition_labels.json"
-
-def save_model(recognizer, labels):
-    if not os.path.isdir(MODEL_SAVE_LOCATION):
-        os.mkdir(MODEL_SAVE_LOCATION, 0755)
-    recognizer.save(os.path.join(MODEL_SAVE_LOCATION, MODEL_BIN_FILE))
-    with open(os.path.join(MODEL_SAVE_LOCATION, MODEL_LABEL_FILE), "wb") as f:
-        json.dump(labels, f)
-
-def load_model():
-    recognizer = cv2.face.LBPHFaceRecognizer_create()
-    recognizer.read(os.path.join(MODEL_SAVE_LOCATION, MODEL_BIN_FILE))
-    with open(os.path.join(MODEL_SAVE_LOCATION, MODEL_LABEL_FILE), "rb") as f:
-        labels = json.load(f)
-    return recognizer, labels
-
-def refine_image(image):
-    x_len, y_len = image.shape[:2]
-    image_rect = dlib.rectangle(left=0, top=0, right=x_len, bottom=y_len)
-
-    image_shape = image.shape
-    shape = FEATURE_PREDICTOR(image, image_rect)
-    shape = face_utils.shape_to_np(shape)
-
-    left_avg = get_feature_average(shape, "left_eye")
-    right_avg = get_feature_average(shape, "right_eye")
-
-    eye_difference  = right_avg - left_avg
-    rads = math.atan(eye_difference[1]/eye_difference[0])
-    degrees = math.degrees(rads)
-
-    orig_dims = image.shape[0:2]
-    rot_image = imutils.rotate(image, degrees)
-
-    new_dims = rot_image.shape[:2]
-
-    rot_shape = translate_rotation(orig_dims, new_dims, degrees, shape)
-    rot_shape = np.array([(int(x[0]), int(x[1])) for x in rot_shape])
-
-    jaw_eye_ratio = calculate_eye_jaw_sides_ratio(rot_shape)
-    if abs(1-jaw_eye_ratio) > 0.15:
-        return None
-
-    first, last = face_utils.FACIAL_LANDMARKS_IDXS["jaw"]
-    jaw = rot_shape[first:last]
-    left_jaw = jaw[0]
-    right_jaw = jaw[-1]
-
-    max_right = rot_image.shape[1]
-    max_down = rot_image.shape[1]
-
-    max_down = min(max_down, max([y for x, y in jaw]))
-
-    first, last = face_utils.FACIAL_LANDMARKS_IDXS["left_eyebrow"]
-    top_most = min([x[1] for x in rot_shape[first:last]])
-    first, last = face_utils.FACIAL_LANDMARKS_IDXS["right_eyebrow"]
-    top_most2 = min([x[1] for x in rot_shape[first:last]])
-
-    left =  max(int(left_jaw[0]), 0)
-    right = min(int(right_jaw[0]), max_right)
-    top = min(top_most, top_most2)
-    bottom = max_down
-    final = rot_image[top:bottom, left:right]
-
-    return final
-
-def get_names_faces_dict(directory, preprocessor=refine_image):
-    name_face_map = defaultdict(list)
-    for dir_name in os.listdir(directory):
-        full_dir = os.path.join(directory, dir_name)
-        if os.path.isdir(full_dir):
-            names = os.listdir(full_dir)
-            if "label.txt" in names:
-                with open(os.path.join(full_dir, "label.txt"), 'r') as f:
-                    label = f.read().strip()
-                for filename in sorted(names):
-                    if filename == 'label.txt':
-                        continue
-                    if not filename.endswith(".png"):
-                        continue
-                    fullname = os.path.join(full_dir, filename)
-                    img = cv2.imread(fullname, 0)
-                    if img is None:
-                        print 'img was none'
-                        continue
-                    refined = preprocessor(img)
-                    name_face_map[label].append(refined)
-    return name_face_map
-
 def format_table(stats):
     table = [
         "   | T | F",
@@ -136,66 +45,19 @@ def format_graph(stats):
 
     return graph.format(**graph_stats)
 
-def translate_to_center_relative(dims, coordinate):
-    x, y = dims
-    x_c = x/2.0
-    y_c = y/2.0
-    #print 'center', x_c, y_c
-    return (coordinate[0]-x_c, coordinate[1]-y_c)
 
-def translate_to_topleft_relative(dims, coordinate):
-    x, y = dims
-    x_c = x/2.0
-    y_c = y/2.0
-    #print 'center', x_c, y_c
-    return (coordinate[0]+x_c, coordinate[1]+y_c)
 
-def translate_rotation(original_dims, new_dims, rotation, coordinates):
-    cr_coordinates = np.array([translate_to_center_relative(original_dims, coordinate) for coordinate in coordinates])
-
-    theta = np.radians(rotation)
-    c, s = np.cos(theta), np.sin(theta)
-    R = np.array(((c, -s), (s, c)))
-
-    rot_coordiantes = np.matmul(cr_coordinates, R)
-
-    not_cr_coordinates = np.array([translate_to_topleft_relative(new_dims, coord) for coord in rot_coordiantes])
-
-    return not_cr_coordinates
-
-FEATURE_PREDICTOR = dlib.shape_predictor('shape_predictor_68_face_landmarks.dat')
-
-def to_face_landmarks(image):
-    x_len, y_len = image.shape[:2]
-    image_rect = dlib.rectangle(left=0, top=0, right=x_len, bottom=y_len)
-    shape = FEATURE_PREDICTOR(image, image_rect)
-    shape = face_utils.shape_to_np(shape)
-    return image, shape
-
-def get_feature_average(shape, feature_name):
-    i, j = face_utils.FACIAL_LANDMARKS_IDXS[feature_name]
-    locs = shape[i:j]
-    return locs.mean(axis=0)
-
-def calculate_eye_jaw_sides_ratio(shape):
-    # Only uses x component, so should probably be done after leveling.
-    # or changed to use full xy distance
-
-    # Calc ratio between eye to jaw left and right sides.
-    first, last = face_utils.FACIAL_LANDMARKS_IDXS["jaw"]
-    jaw = shape[first:last]
-    left_jaw = jaw[0]
-    right_jaw = jaw[-1]
-
-    left_avg = get_feature_average(shape, "left_eye")
-
-    right_avg = get_feature_average(shape, "right_eye")
-
-    jaw_eye_ratio = (right_avg[0]-right_jaw[0])/(left_jaw[0]-left_avg[0])
-
-    return jaw_eye_ratio
 
 MATCH_DATA_DIR = "match_data"
+def get_people_list():
+    with open(os.path.join(MATCH_DATA_DIR, "people.json"), "rb") as f:
+        people = json.load(f)
+    return people
+
+def write_people_list(people):
+    with open(os.path.join(MATCH_DATA_DIR, "people.json"), "wb") as f:
+        json.dump(people, f)
+
 def read_match_data():
     all_data = {}
     for dir_name in os.listdir(MATCH_DATA_DIR):
@@ -219,27 +81,34 @@ def load_person(directory):
             info['encodings'].append(encoding)
     return info
 
-def load_and_cache_encoding(directory, prefix):
+def load_and_cache_encoding(directory, prefix, jitters=100):
     bin_file = os.path.join(directory, prefix)
     if os.path.isfile(bin_file + ".npy"):
         encoding = np.load(bin_file + ".npy")
+        if not encoding.any():
+            return None
     else:
         if os.path.isfile(os.path.join(directory, prefix + ".png")):
-            encoding = compute_image_encoding(directory, prefix + ".png")
+            encoding = compute_image_encoding(directory, prefix + ".png", jitters)
         else:
-            encoding = compute_image_encoding(directory, prefix + ".jpg")
+            encoding = compute_image_encoding(directory, prefix + ".jpg", jitters)
+        if encoding is None:
+            encoding = np.array(0)
         np.save(bin_file, encoding)
     return encoding
 
-def compute_image_encoding(directory, filename):
+def compute_image_encoding(directory, filename, jitters=100):
     """
     Assumes it will receive an image with a single face in it.
     No more, no less.
     """
     fullname = os.path.join(directory, filename)
     img = face_recognition.load_image_file(fullname)
-    face_encoding = face_recognition.face_encodings(img, num_jitters=100)[0]
-    return face_encoding
+    face_encodings = face_recognition.face_encodings(img, num_jitters=jitters)
+    if len(face_encodings) > 0:
+        return face_encodings[0]
+    else:
+        return None
 
 
 def get_names_faces_lists(all_data):
@@ -273,47 +142,26 @@ def get_identified_people(cv2_img, known_faces, names):
 
     return hits
 
-import time
-#times = {
-#    'loc': 0,
-#    'enc': 0,
-#    'dis': 0,
-#}
-def test_data_stuff(cv2_img, known_faces):
+def get_face_distances(cv2_img, known_faces):
     # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
     rgb_frame = cv2_img[:, :, ::-1]
 
     # Find all the faces and face enqcodings in the frame of video
-    #t1 = time.time()
     face_locations = face_recognition.face_locations(rgb_frame)
-    #t2 = time.time()
-    # ugh stuck here
-    #times['loc'] += t2-t1
     face_encodings = face_recognition.face_encodings(rgb_frame, face_locations, num_jitters=10)
-    #t3 = time.time()
-    #times['enc'] += t3-t2
     if len(face_encodings) == 0:
         return None
-    face_encoding = face_encodings[0]
+    return get_face_distances_with_encoding(face_encodings[0], known_faces)
 
-    #... distance.
+def get_face_distances_with_encoding(face_encoding, known_faces):
     #matches = face_recognition.compare_faces(known_faces, face_encoding)
     distances = face_recognition.face_distance(known_faces, face_encoding)
-    #t4 = time.time()
-    #times['dis'] += t4-t3
     return distances
 
-    #hits = defaultdict(int)
-    #for match, name in zip(matches, names):
-        # FML that 'match' is a np bool, not 'is True'
-        #if match == True:
-            #hits[name] += 1
-
-    #return hits
 
 TOLERANCE = 0.35
 def get_best_match(cv2_img, known_faces, names):
-    distances = test_data_stuff(cv2_img, known_faces)
+    distances = get_face_distances(cv2_img, known_faces)
     if distances is None:
         return None
 

@@ -16,7 +16,7 @@ def run(directory):
     match_data = utils.read_match_data()
     pnames, faces = utils.get_names_faces_lists(match_data)
 
-    person_scores = defaultdict(lambda: {"tp":0,"tn":0,"fp":0,"fn":0, 'fn_vals':[], 'tn_vals':[]})
+    person_scores = defaultdict(lambda: {"tp":0,"tnn":0,"tn":0,"fp":0,"fn":0, 'fn_vals':[], 'tn_vals':[]})
 
 
     for dir_name in os.listdir(directory):
@@ -30,14 +30,17 @@ def run(directory):
             for img_name in names:
                 if img_name == 'name.txt':
                     continue
-                img_path = os.path.join(directory, dir_name, img_name)
-                img = cv2.imread(img_path, 1)
-
-                distances = utils.test_data_stuff(img, faces)
-                if distances is None:
-                    print dir_name, img_name
-                    person_scores[truth_name]['tn'] += 1
+                if img_name.endswith(".png") or img_name.endswith(".jpg"):
+                    encoding = utils.load_and_cache_encoding(fullpath, img_name[:-4], jitters=10)
+                else:
                     continue
+
+                if encoding is None:
+                    print 'no face found', dir_name, img_name
+                    person_scores[truth_name]['tnn'] += 1
+                    continue
+
+                distances = utils.get_face_distances_with_encoding(encoding, faces)
                 min_score = 1
                 min_name = ''
                 for name, score in zip(pnames, distances):
@@ -67,6 +70,7 @@ def run(directory):
         #print 'avg tn', sum(scores['tn_vals'])/len(scores['tn_vals'])
         #print 'avg fn', sum(scores['fn_vals'])/len(scores['fn_vals'])
         print utils.format_graph(scores)
+        print scores
 
 """
 tp = score good and match good
