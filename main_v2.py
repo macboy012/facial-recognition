@@ -70,7 +70,7 @@ class Wakeup(object):
         self.wake_process.wait()
         self.wake_process = None
 
-pool = Pool(1)
+pool = Pool(4)
 ID_PHOTO_COUNT = 6
 FACE_CAPTURE_DIRECTORY = "imgs"
 class FaceIdentifier(object):
