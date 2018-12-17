@@ -123,6 +123,7 @@ class FaceIdentifier(object):
             self.active_faces = []
 
         prediction = None
+        have_match = False
         next_active_groups = []
         # this is broke as shit, 1 active group right now. NEVER MORE
         for group in self.active_groups:
@@ -140,11 +141,12 @@ class FaceIdentifier(object):
                 done = face_check['done'] and done
             if done:
                 prediction = self.process_prediction(group)
+                have_match = True
 
             else:
                 next_active_groups.append(group)
         self.active_groups = next_active_groups
-        return prediction
+        return have_match, prediction
 
     def process_prediction(self, capture_group):
         test_set = set()
@@ -250,11 +252,14 @@ def main_loop():
             x, y, w, h = face
             cv2.rectangle(frame, (x, y), (x+w, y+h), DRAWING_COLOR, 15)
 
-        prediction = face_identifier.check_stuff()
-        if prediction is not None:
-            action = functools.partial(text_action, prediction=prediction)
+        have_match, prediction = face_identifier.check_stuff()
+        if have_match:
+            if prediction is None:
+                action = functools.partial(text_action, prediction='No match')
+            else:
+                action = functools.partial(text_action, prediction=prediction)
+                # open sesame
             timed_frame_modify.add_modification(action, 2)
-            # open sesame
 
         frame_counter += 1
 
