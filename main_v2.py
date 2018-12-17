@@ -35,13 +35,12 @@ class TimedFrameModify(object):
         mod = {
             'action': action,
             'endtime': time.time()+seconds,
-            'mtype'; mtype,
+            'mtype': mtype,
         }
 
         if exclusive:
-            for tmod in actions:
+            for tmod in self.actions:
                 if tmod['mtype'] == mtype:
-                    print 'overwrite'
                     tmod['action'] = action
                     tmod['endtime'] = time.time()+seconds
                     break
@@ -275,7 +274,7 @@ def main_loop():
             else:
                 action = functools.partial(text_action, prediction=prediction)
                 # open sesame
-            timed_frame_modify.add_modification(action, 2, 'nametext')
+            timed_frame_modify.add_modification(action, 2, 'nametext', exclusive=True)
 
         frame_counter += 1
 
