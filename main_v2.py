@@ -19,11 +19,11 @@ class TimedFrameModify(object):
     def process_frame(self, frame):
         now = time.time()
         save_actions = []
-        for action, endtime in self.actions:
-            if endtime < time.time():
+        for mod in self.actions:
+            if mod['endtime'] < time.time():
                 continue
-            save_actions.append((action, endtime))
-            frame = action(frame)
+            save_actions.append(mod)
+            frame = mod['action'](frame)
 
         self.actions = save_actions
 
@@ -31,8 +31,24 @@ class TimedFrameModify(object):
         # * when it's a numpy array/cv2 image
         return frame
 
-    def add_modification(self, action, seconds):
-        self.actions.append((action, time.time()+seconds))
+    def add_modification(self, action, seconds, mtype, exclusive=False):
+        mod = {
+            'action': action,
+            'endtime': time.time()+seconds,
+            'mtype'; mtype,
+        }
+
+        if exclusive:
+            for tmod in actions:
+                if tmod['mtype'] == mtype:
+                    print 'overwrite'
+                    tmod['action'] = action
+                    tmod['endtime'] = time.time()+seconds
+                    break
+            else:
+                self.actions.append(mod)
+        else:
+            self.actions.append(mod)
 
 class Wakeup(object):
     def __init__(self):
@@ -55,7 +71,7 @@ class Wakeup(object):
         self.wake_process = None
 
 pool = Pool(1)
-ID_PHOTO_COUNT = 4
+ID_PHOTO_COUNT = 6
 FACE_CAPTURE_DIRECTORY = "imgs"
 class FaceIdentifier(object):
     def __init__(self):
@@ -259,7 +275,7 @@ def main_loop():
             else:
                 action = functools.partial(text_action, prediction=prediction)
                 # open sesame
-            timed_frame_modify.add_modification(action, 2)
+            timed_frame_modify.add_modification(action, 2, 'nametext')
 
         frame_counter += 1
 
