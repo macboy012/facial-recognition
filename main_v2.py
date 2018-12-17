@@ -265,6 +265,7 @@ def main_loop():
 
         if wakeup.are_we_awake():
             frame = timed_frame_modify.process_frame(frame)
+            frame = cv2.flip(frame, flipCode=1)
             cv2.imshow('Video', frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
