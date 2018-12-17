@@ -1,5 +1,5 @@
 import atexit
-from collections import deque
+from collections import deque, Counter
 import cv2
 import datetime
 import functools
@@ -166,12 +166,28 @@ class FaceIdentifier(object):
     def process_prediction(self, capture_group):
         test_set = set()
         prediction = None
+
+        """
         for face_check in capture_group:
             test_set.add(face_check['prediction'])
         if len(test_set) == 1:
             test_set_val = list(test_set)[0]
             if test_set_val is not None:
                 prediction = test_set_val
+        """
+
+        counter = Counter([face_check['prediction'] for face_check in capture_group])
+
+        prediction = None
+        if len(counter) == 1:
+            prediction = counter.keys()[0]
+        elif len(counter) == 2:
+            if None in counter:
+                keys  = counter.keys()
+                keys.remove(None)
+                other = keys[0]
+                if counter[None] <= counter[other]:
+                    prediction = other
 
         our_dir = os.path.join(FACE_CAPTURE_DIRECTORY, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S.%f"))
         os.mkdir(our_dir, 0755)
