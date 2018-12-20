@@ -65,6 +65,10 @@ def run(directory):
         if os.path.isdir(fullpath) and dir_name != "__pycache__":
             filenames = os.listdir(fullpath)
             if "name.txt" in filenames:
+                with open(os.path.join(directory, dir_name, "name.txt")) as f:
+                    name = f.read().strip()
+                    if name not in [p['name'] for p in people_list]:
+                        print "Unknown label", name
                 continue
             for i, fname in enumerate(filenames):
                 if not fname.endswith(".png"):
