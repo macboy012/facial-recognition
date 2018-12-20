@@ -36,7 +36,7 @@ def run(directory):
                     continue
 
                 if encoding is None:
-                    print 'no face found', dir_name, img_name
+                    #print 'no face found', dir_name, img_name
                     person_scores[truth_name]['tnn'] += 1
                     continue
 
@@ -59,18 +59,21 @@ def run(directory):
                     if truth_name == min_name:
                         person_scores[truth_name]['tp'] += 1
                     else:
+                        print "PANIC, FALSE POSITVE - file: %s, true: %s, pred: %s" % (os.path.join(fullpath, img_name), truth_name, min_name)
                         person_scores[truth_name]['fp'] += 1
 
     #print person_scores
     for name, scores in person_scores.items():
-        print "-------------------------"
-        print name
-        print 'tn', uuuh_stats(scores['tn_vals'])
-        print 'fn', uuuh_stats(scores['fn_vals'])
+        #print "-------------------------"
+        #print name
+        sumv = sum([scores['tp'], scores['tn'], scores['fn'], scores['tnn']])
+        print name, 1 if sumv == 0 else float(scores['tp'])/sumv
+        #print 'tn', uuuh_stats(scores['tn_vals'])
+        #print 'fn', uuuh_stats(scores['fn_vals'])
         #print 'avg tn', sum(scores['tn_vals'])/len(scores['tn_vals'])
         #print 'avg fn', sum(scores['fn_vals'])/len(scores['fn_vals'])
-        print utils.format_graph(scores)
-        print scores
+        #print utils.format_graph(scores)
+        #print scores
 
 """
 tp = score good and match good
