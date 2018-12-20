@@ -67,13 +67,15 @@ def run(directory):
             if "name.txt" in filenames:
                 continue
             for i, fname in enumerate(filenames):
+                if not fname.endswith(".png"):
+                    continue
                 img_path = os.path.join(directory, dir_name, fname)
                 img = cv2.imread(img_path, 1)
                 cv2.imshow('image', img)
                 cv2.waitKey(1)
                 bm = utils.get_best_match(img, face_encodings, names)
                 if bm is None:
-                    if i < 3:
+                    if i < 4:
                         continue
                     else:
                         name = prompt_person(people_list)
