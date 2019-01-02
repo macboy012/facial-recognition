@@ -2,57 +2,12 @@ import cv2
 import os
 import sys
 import shutil
+import time
 
 import utils
 
 import json
 
-
-
-def prompt_person(people_list):
-    OFFSET = 3
-    print " 1) Other"
-    print " 2) Never match"
-    i = 0
-    for i, person in enumerate(people_list):
-        print " %s) %s" % (i+OFFSET, person['name'])
-
-    while True:
-        num = raw_input("number? ")
-        try:
-            num = int(num)
-            if num > i+OFFSET or num < 1:
-                continue
-        except ValueError:
-            continue
-        break
-    if num == 1:
-        name = raw_input("name? ")
-        email = raw_input("email? ")
-        if email == '':
-            email = name.lower()
-        people_list.append({
-            'name': name,
-            'email': email+"@athinkingape.com",
-        })
-        return name
-    elif num == 2:
-        return 'nevermatch'
-    else:
-        return people_list[num-OFFSET]['name']
-
-def prompt_yn(name):
-    while True:
-        inp = raw_input("Is this %s? ([y]/n)" % name)
-        if inp == '' or inp == 'y':
-            return name
-        elif inp == 'n':
-            return None
-
-def write_name(directory, dir_name, name):
-    label_path = os.path.join(directory, dir_name, "name.txt")
-    with open(label_path, 'w') as f:
-        f.write(name+"\n")
 
 def run(directory):
 
@@ -60,38 +15,72 @@ def run(directory):
     names, face_encodings = utils.get_names_faces_lists(match_data)
     people_list = utils.get_people_list()
 
+    todo = []
     for dir_name in os.listdir(directory):
         fullpath = os.path.join(directory, dir_name)
-        if os.path.isdir(fullpath) and dir_name != "__pycache__":
-            filenames = os.listdir(fullpath)
-            if "name.txt" in filenames:
-                with open(os.path.join(directory, dir_name, "name.txt")) as f:
-                    name = f.read().strip()
-                    if name not in [p['name'] for p in people_list]:
-                        print "Unknown label", name
+        if not os.path.isdir(fullpath) or dir_name == "__pycache__":
+            continue
+
+        filenames = os.listdir(fullpath)
+        if "name.txt" in filenames:
+            with open(os.path.join(directory, dir_name, "name.txt")) as f:
+                name = f.read().strip()
+                if name not in [p['name'] for p in people_list] and name != 'nevermatch':
+                    print "Unknown label", name
+            continue
+        todo.append(dir_name)
+
+    for i, dir_name in enumerate(todo):
+        print "%s/%s" % (i+1, len(todo)), dir_name
+    #for dir_name in os.listdir(directory):
+        fullpath = os.path.join(directory, dir_name)
+        filenames = os.listdir(fullpath)
+        image_count = sum([fname.endswith(".png") for fname in filenames])
+        no_face = 0
+        no_match = 0
+        for i, fname in enumerate(filenames):
+            if not fname.endswith(".png"):
                 continue
-            for i, fname in enumerate(filenames):
-                if not fname.endswith(".png"):
-                    continue
-                img_path = os.path.join(directory, dir_name, fname)
-                img = cv2.imread(img_path, 1)
-                cv2.imshow('image', img)
-                cv2.waitKey(1)
+            img_path = os.path.join(directory, dir_name, fname)
+            img = cv2.imread(img_path, 1)
+            cv2.imshow('image', img)
+            cv2.waitKey(1)
+
+            bm = None
+            try:
                 bm = utils.get_best_match(img, face_encodings, names)
-                if bm is None:
-                    if i < 4:
-                        continue
-                    else:
-                        name = prompt_person(people_list)
-                        write_name(directory, dir_name, name)
-                        break
+            except utils.NoFaceException:
+                no_face += 1
+            except utils.NoMatchException:
+                no_match += 1
 
-                name = prompt_yn(bm)
-                if name is None:
-                    name = prompt_person(people_list)
-
-                write_name(directory, dir_name, name)
+            if no_face > (image_count/2)+1:
+                print 'writing', 'nevermatch'
+                utils.write_name(directory, dir_name, 'nevermatch')
                 break
+
+            if no_match > (image_count/2)+1:
+                name = utils.prompt_person(people_list)
+                print 'writing', name
+                utils.write_name(directory, dir_name, name)
+                break
+
+            if bm is None:
+                continue
+
+            name = None
+            if utils.prompt_yn("Is this %s?" % bm):
+                name = bm
+
+            if name is None:
+                name = utils.prompt_person(people_list)
+            print 'writing', name
+            utils.write_name(directory, dir_name, name)
+            break
+        else:
+            # We didn't take any action because we didn't hit any of the flags, this is a nevermatch
+            print 'writing', 'nevermatch'
+            utils.write_name(directory, dir_name, 'nevermatch')
 
     utils.write_people_list(people_list)
 

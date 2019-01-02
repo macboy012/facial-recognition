@@ -53,7 +53,10 @@ DRAWING_COLOR = (100,0,255)
 MATCH_DATA = utils.read_match_data()
 NAMES, FACE_ENCODINGS = utils.get_names_faces_lists(MATCH_DATA)
 def get_best_match(cv2_img):
-    match_person = utils.get_best_match(cv2_img, FACE_ENCODINGS, NAMES)
+    try:
+        match_person = utils.get_best_match(cv2_img, FACE_ENCODINGS, NAMES)
+    except Exception as e:
+        match_person = None
     return match_person
 
 class FaceCapture(object):

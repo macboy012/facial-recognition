@@ -46,6 +46,10 @@ def format_graph(stats):
     return graph.format(**graph_stats)
 
 
+class NoFaceException(Exception):
+    pass
+class NoMatchException(Exception):
+    pass
 
 
 MATCH_DATA_DIR = "match_data"
@@ -85,8 +89,6 @@ def load_and_cache_encoding(directory, prefix, jitters=100):
     bin_file = os.path.join(directory, prefix)
     if os.path.isfile(bin_file + ".npy"):
         encoding = np.load(bin_file + ".npy")
-        if not encoding.any():
-            return None
     else:
         if os.path.isfile(os.path.join(directory, prefix + ".png")):
             encoding = compute_image_encoding(directory, prefix + ".png", jitters)
@@ -95,6 +97,9 @@ def load_and_cache_encoding(directory, prefix, jitters=100):
         if encoding is None:
             encoding = np.array(0)
         np.save(bin_file, encoding)
+
+    if not encoding.any():
+        return None
     return encoding
 
 def compute_image_encoding(directory, filename, jitters=100):
@@ -159,11 +164,20 @@ def get_face_distances_with_encoding(face_encoding, known_faces):
     return distances
 
 
-TOLERANCE = 0.35
+
+def get_best_match_with_encoding(encoding, known_faces, names):
+    distances = get_face_distances_with_encoding(encoding, known_faces)
+    return _get_best_match(distances, names)
+
 def get_best_match(cv2_img, known_faces, names):
     distances = get_face_distances(cv2_img, known_faces)
+    return _get_best_match(distances, names)
+
+TOLERANCE = 0.35
+def _get_best_match(distances, names):
     if distances is None:
-        return None
+        raise NoFaceException()
+        #return None
 
     min_dist = 1
     use_name = None
@@ -174,7 +188,61 @@ def get_best_match(cv2_img, known_faces, names):
 
 
     if min_dist > TOLERANCE:
-        return None
+        raise NoMatchException()
+        #return None
     else:
         return use_name
+
+
+
+
+def prompt_person(people_list):
+    OFFSET = 3
+    print " 1) Other"
+    print " 2) Never match"
+    i = 0
+    for i, person in enumerate(people_list):
+        print " %s) %s" % (i+OFFSET, person['name'])
+
+    while True:
+        num = raw_input("number? ")
+        try:
+            num = int(num)
+            if num > i+OFFSET or num < 1:
+                continue
+        except ValueError:
+            continue
+        break
+    if num == 1:
+        while True:
+            name = raw_input("name? ")
+            email = raw_input("email? ")
+            if email == '':
+                email = name.lower()
+            if utils.prompt_yn("%s - %s correct?" % (name, email)):
+                break
+        people_list.append({
+            'name': name,
+            'email': email+"@athinkingape.com",
+        })
+        return name
+    elif num == 2:
+        return 'nevermatch'
+    else:
+        return people_list[num-OFFSET]['name']
+
+def prompt_yn(text):
+    while True:
+        inp = raw_input("%s ([y]/n)" % text)
+        if inp == '' or inp == 'y':
+            return True
+        elif inp == 'n':
+            return False
+
+def write_name(directory, dir_name, name):
+    label_path = os.path.join(directory, dir_name, "name.txt")
+    with open(label_path, 'w') as f:
+        f.write(name+"\n")
+
+
 
