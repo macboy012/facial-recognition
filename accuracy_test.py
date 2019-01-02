@@ -59,8 +59,9 @@ def run(directory):
                     if truth_name == min_name:
                         person_scores[truth_name]['tp'] += 1
                     else:
-                        print "PANIC, FALSE POSITVE - file: %s, true: %s, pred: %s" % (os.path.join(fullpath, img_name), truth_name, min_name)
-                        person_scores[truth_name]['fp'] += 1
+                        if truth_name != 'nevermatch':
+                            print "PANIC, FALSE POSITVE - file: %s, true: %s, pred: %s" % (os.path.join(fullpath, img_name), truth_name, min_name)
+                            person_scores[truth_name]['fp'] += 1
 
     #print person_scores
     for name, scores in person_scores.items():
