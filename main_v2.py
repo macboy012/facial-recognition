@@ -10,6 +10,10 @@ import os
 import subprocess
 import time
 import utils
+import requests
+import socket
+
+FACE_OPEN_COOKIE = r'ANNX/~?v\O(b9PIJJ_bX,Rkn-Fai*IX4VdoOP?_PmInt+ll/'
 
 class TimedFrameModify(object):
     def __init__(self):
@@ -259,14 +263,45 @@ def look_for_faces(frame):
 
 DRAWING_COLOR = (100,0,255)
 
-def text_action(frame, prediction):
-    cv2.putText(frame, prediction, (150,450), cv2.FONT_HERSHEY_DUPLEX, 6.0, DRAWING_COLOR, 12)
+#putText( ., text, scale, color, chickness)
+#getTextSize(text, font, fontscale, thickness)
+
+def draw_xcentered_text(frame, text, height):
+    fheight, fwidth, _ = frame.shape
+    #base_font_scale = 6.0
+    font_scale = 6.0
+    #base_thickness = 10
+    thickness = 10
+    increment = 0.5
+    while True:
+        size = cv2.getTextSize(text, cv2.FONT_HERSHEY_DUPLEX, font_scale, thickness)
+        twidth = size[0][0]
+        theight = size[0][1]
+        baseline = size[1]
+        if twidth <= fwidth * 0.98:
+            break
+        font_scale -= increment
+
+    x = (fwidth - twidth) / 2
+
+    if height >= 0:
+        y = theight+height
+    else:
+        y = fheight - baseline - theight - height
+
+    if font_scale < 3.5:
+        thickness -= 2
+
+    cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_DUPLEX, font_scale, DRAWING_COLOR, thickness)
     return frame
+
 
 def main_loop():
     wakeup = Wakeup()
     face_identifier = FaceIdentifier()
     timed_frame_modify = TimedFrameModify()
+
+    people_dict = {p['name']:p for p in utils.get_people_list()}
 
     last_frame = None
     frame_counter = 0
@@ -289,10 +324,31 @@ def main_loop():
         have_match, prediction = face_identifier.check_stuff()
         if have_match:
             if prediction is None:
-                action = functools.partial(text_action, prediction='No match')
+                action = functools.partial(draw_xcentered_text, text='No match', height=100)
+
             else:
-                action = functools.partial(text_action, prediction=prediction)
-                # open sesame
+                action = functools.partial(draw_xcentered_text, text=prediction, height=100)
+
+
+                email = people_dict[prediction]['email']
+                print email
+                try:
+                    socket.gethostbyname("frontdoor")
+                except:
+                    pass
+                else:
+                    response = requests.get("http://frontdoor/api/face_open_door", params={"email":email}, cookies={"Auth":FACE_OPEN_COOKIE})
+                    print response.content
+                    resp_data = response.json()
+                    if resp_data['status'] == 'failure':
+                        info = None
+                        if resp_data['message'] == 'Outside of working hours':
+                            info = functools.partial(draw_xcentered_text, text="Outside work hours", height=-50)
+                        elif resp_data['message'] == 'Please reauthenticate':
+                            info = functools.partial(draw_xcentered_text, text="Login: http://frontdoor/", height=-50)
+                        if info is not None:
+                            timed_frame_modify.add_modification(info, 2, 'infotext', exclusive=True)
+
             timed_frame_modify.add_modification(action, 2, 'nametext', exclusive=True)
 
         frame_counter += 1
