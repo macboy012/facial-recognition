@@ -219,7 +219,7 @@ def prompt_person(people_list):
             email = raw_input("email? ")
             if email == '':
                 email = name.lower()
-            if utils.prompt_yn("%s - %s correct?" % (name, email)):
+            if prompt_yn("%s - %s correct?" % (name, email)):
                 break
         people_list.append({
             'name': name,
