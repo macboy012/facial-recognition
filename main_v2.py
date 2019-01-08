@@ -12,6 +12,9 @@ import time
 import utils
 import requests
 import socket
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s: %(levelname)s: %(pathname)s:line %(lineno)d: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 FACE_OPEN_COOKIE = r'ANNX/~?v\O(b9PIJJ_bX,Rkn-Fai*IX4VdoOP?_PmInt+ll/'
 
@@ -184,6 +187,7 @@ class FaceIdentifier(object):
         """
 
         counter = Counter([face_check['prediction'] for face_check in capture_group])
+        logging.info(counter)
 
         prediction = None
         if len(counter) == 1:
@@ -331,14 +335,14 @@ def main_loop():
 
 
                 email = people_dict[prediction]['email']
-                print email
+                logging.info(email)
                 try:
                     socket.gethostbyname("frontdoor")
                 except:
                     pass
                 else:
                     response = requests.get("http://frontdoor/api/face_open_door", params={"email":email}, cookies={"Auth":FACE_OPEN_COOKIE})
-                    print response.content
+                    logging.info(response.content)
                     resp_data = response.json()
                     if resp_data['status'] == 'failure':
                         info = None
