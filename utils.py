@@ -201,7 +201,9 @@ def prompt_person(people_list):
     print " 1) Other"
     print " 2) Never match"
     i = 0
-    for i, person in enumerate(people_list):
+    i_name = {}
+    for i, person in enumerate(sorted(people_list)):
+        i_name[i+OFFSET] = person
         print " %s) %s" % (i+OFFSET, person['name'])
 
     while True:
@@ -229,7 +231,7 @@ def prompt_person(people_list):
     elif num == 2:
         return 'nevermatch'
     else:
-        return people_list[num-OFFSET]['name']
+        return i_name[num]['name']
 
 def prompt_yn(text):
     while True:
