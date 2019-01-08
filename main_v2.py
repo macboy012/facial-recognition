@@ -188,6 +188,8 @@ class FaceIdentifier(object):
 
         counter = Counter([face_check['prediction'] for face_check in capture_group])
         logging.info(counter)
+        reason_counter = Counter([face_check['reason'] for face_check in capture_group])
+        logging.info(reason_counter)
 
         prediction = None
         if len(counter) == 1:
@@ -197,8 +199,10 @@ class FaceIdentifier(object):
                 keys  = counter.keys()
                 keys.remove(None)
                 other = keys[0]
-                if counter[None] <= counter[other]:
+                if counter[other] >= 2:
                     prediction = other
+                #if counter[None] <= counter[other]:
+                    #prediction = other
 
         our_dir = os.path.join(FACE_CAPTURE_DIRECTORY, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S.%f"))
         os.mkdir(our_dir, 0755)
