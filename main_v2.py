@@ -153,14 +153,22 @@ class FaceIdentifier(object):
                 if face_check['done'] is True:
                     continue
                 try:
+                    result = None
+                    reason = None
                     try:
                         result = face_check['async_result'].get(timeout=0.01)
-                    except (utils.NoFaceException, utils.NoMatchException) as e:
-                        result = None
+                        reason = 'match'
+                    except utils.NoFaceException:
+                        reason = 'no_face'
+                    except utils.NoMatchException:
+                        reason = 'no_match'
+
                     face_check['prediction'] = result
                     face_check['done'] = True
+                    face_check['reason'] = reason
                 except TimeoutError:
                     pass
+
             done = True
             for face_check in group:
                 done = face_check['done'] and done
