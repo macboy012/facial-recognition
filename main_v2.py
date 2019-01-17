@@ -353,15 +353,21 @@ def main_loop():
                 except:
                     pass
                 else:
-                    response = requests.get("http://frontdoor/api/face_open_door", params={"email":email}, cookies={"Auth":FACE_OPEN_COOKIE})
-                    logging.info(response.content)
-                    resp_data = response.json()
+                    try:
+                        response = requests.get("http://frontdoor/api/face_open_door", params={"email":email}, cookies={"Auth":FACE_OPEN_COOKIE}, timeout=3)
+                    except requests.exceptions.Timeout:
+                        resp_data = {'status': 'failure', 'message': 'Timeout'}
+                    else:
+                        logging.info(response.content)
+                        resp_data = response.json()
                     if resp_data['status'] == 'failure':
                         info = None
                         if resp_data['message'] == 'Outside of working hours':
                             info = functools.partial(draw_xcentered_text, text="Outside work hours", height=-50)
                         elif resp_data['message'] == 'Please reauthenticate':
                             info = functools.partial(draw_xcentered_text, text="Login: http://frontdoor/", height=-50)
+                        elif resp_data['message'] == 'Timeout':
+                            info = functools.partial(draw_xcentered_text, text="Timeout", height=-50)
                         if info is not None:
                             timed_frame_modify.add_modification(info, 2, 'infotext', exclusive=True)
 
