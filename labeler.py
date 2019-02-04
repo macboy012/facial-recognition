@@ -3,13 +3,15 @@ import os
 import sys
 import shutil
 import time
-
-import utils
+from collections import defaultdict
 
 import json
 
+import utils
+
 
 def run(directory):
+    tree_model = utils.TreeModel(utils.load_model("modelv2_testing.pkl"))
 
     match_data = utils.read_match_data()
     names, face_encodings = utils.get_names_faces_lists(match_data)
@@ -38,10 +40,26 @@ def run(directory):
         image_count = sum([fname.endswith(".png") for fname in filenames])
         no_face = 0
         no_match = 0
+
+        representative_img = None
+        encodings = []
         for i, fname in enumerate(filenames):
             if not fname.endswith(".png"):
                 continue
-            img_path = os.path.join(directory, dir_name, fname)
+
+            img = cv2.imread(os.path.join(fullpath, fname), 1)
+            cv2.imshow('image', img)
+            cv2.waitKey(1)
+
+            encoding = utils.load_and_cache_encoding(fullpath, fname[:-4], jitters=10)
+            if encoding is None:
+                continue
+            else:
+                encodings.append(encoding)
+                representative_img = os.path.join(fullpath, fname)
+                continue
+            # Dead
+
             img = cv2.imread(img_path, 1)
             cv2.imshow('image', img)
             cv2.waitKey(1)
@@ -77,13 +95,56 @@ def run(directory):
             print 'writing', name
             utils.write_name(directory, dir_name, name)
             break
-        else:
+
+        #else:
             # We didn't take any action because we didn't hit any of the flags, this is a nevermatch
+            #print 'writing', 'nevermatch'
+            #utils.write_name(directory, dir_name, 'nevermatch')
+
+        if len(encodings) == 0:
             print 'writing', 'nevermatch'
             utils.write_name(directory, dir_name, 'nevermatch')
+            continue
+
+        preds = tree_model.get_predictions(encodings)
+        votes = defaultdict(int)
+        for p in preds:
+            if p is None:
+                continue
+            votes[p] += 1
+
+
+        img = cv2.imread(representative_img, 1)
+        cv2.imshow('image', img)
+        cv2.waitKey(50)
+
+        # for ambiguous directories, just say we'll never match. 
+        if len(votes) > 1:
+            print 'writing', 'nevermatch'
+            utils.write_name(directory, dir_name, 'nevermatch')
+            continue
+
+        total_votes = sum(votes.values())
+
+
+        # if not enough votes, prompt
+        if total_votes < 2:
+            if len(votes) > 0:
+                final_name = votes.keys()[0]
+                if not utils.prompt_yn("Is this %s?" % final_name):
+                    final_name = utils.prompt_person(people_list)
+            else:
+                final_name = utils.prompt_person(people_list)
+
+            print 'writing', final_name
+            utils.write_name(directory, dir_name, final_name)
+        else:
+            final_name = votes.keys()[0]
+            print 'writing', final_name
+            utils.write_name(directory, dir_name, final_name)
+
 
     utils.write_people_list(people_list)
-
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
