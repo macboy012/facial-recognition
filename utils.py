@@ -8,6 +8,8 @@ import dlib
 from imutils import face_utils
 import imutils
 import face_recognition
+from six.moves import cPickle as pickle
+from sklearn.neighbors import KDTree
 
 def format_table(stats):
     table = [
@@ -247,4 +249,114 @@ def write_name(directory, dir_name, name):
         f.write(name+"\n")
 
 
+def load_people(directory):
+    """
+    returns a dictionary of name to list of face encodings
+    ignores all nevermatch image sets
+    """
+    people = defaultdict(list)
+    for dir_name in os.listdir(directory):
+        fullpath = os.path.join(directory, dir_name)
+        if os.path.isdir(fullpath) and dir_name != "__pycache__":
+            names = os.listdir(fullpath)
+            if "name.txt" not in names:
+                continue
+            with open(os.path.join(fullpath, "name.txt"), "rb") as f:
+                truth_name = f.read().strip()
+            if truth_name == 'nevermatch':
+                continue
+            for img_name in names:
+                if img_name == 'name.txt':
+                    continue
+                if img_name.endswith(".png") or img_name.endswith(".jpg"):
+                    encoding = load_and_cache_encoding(fullpath, img_name[:-4], jitters=10)
 
+                    if encoding is None:
+                        continue
+                    people[truth_name].append((encoding, os.path.join(fullpath, img_name)))
+                else:
+                    continue
+
+    return people
+
+
+class FaceNameStorage(object):
+    def __init__(self, names, faces, filepaths=None):
+        self.names = names
+        self.faces = faces
+        self.filepaths = filepaths
+        self._tree = None
+
+
+class TreeModel(object):
+    MAX_DISTANCE = 0.32
+    NEIGHBOUR_COUNT = 10
+    MIN_NEIGHBOUR_COUNT = 5
+    def __init__(self, face_name_storage, max_distance=MAX_DISTANCE, neighbour_count=NEIGHBOUR_COUNT):
+        self.face_name_storage = face_name_storage
+        self.faces = self.face_name_storage.faces
+        self.names = self.face_name_storage.names
+        self.tree = KDTree(self.faces)
+        self.max_distance = max_distance
+        self.neighbour_count = neighbour_count
+
+    def get_predictions(self, faces):
+        results = []
+
+        #distances_s, indices_s = self.tree.query(faces, k=self.neighbour_count)
+        indices_s = self.tree.query_radius(faces, r=self.max_distance)
+        #for distances, indices in zip(distances_s, indices_s):
+        for indices in indices_s:
+            votes = defaultdict(int)
+            #for distance, index in zip(distances, indices):
+            for index in indices:
+                #if distance <= self.max_distance:
+                votes[self.names[index]] += 1
+
+            total_votes = sum(votes.values())
+            if total_votes < self.MIN_NEIGHBOUR_COUNT:
+                results.append(None)
+                continue
+            # If we didn't get at least 1/4 of our nearest neighbours inside our distance, no match
+            #if total_votes < self.NEIGHBOUR_COUNT/4:
+                #results.append(None)
+                #continue
+
+            best_person_name, best_person_votes = sorted(votes.items(), key=lambda x: x[1], reverse=True)[0]
+            # Make sure our vote leader has more than half of the total votes
+            if (best_person_votes / float(total_votes)) < 0.5:
+                results.append(None)
+                continue
+
+            results.append(best_person_name)
+
+
+        return results
+
+def save_directory_to_model(directory, model_path):
+    people = load_people(directory)
+
+    serialized = []
+    index_map = []
+    files = []
+
+    test_data = []
+    for name, faces in people.items():
+        for face, filepath in faces:
+            #if random.random() < (TEST_PERCENT/100.0):
+                #test_data.append((name, face))
+            #else:
+            index_map.append(name)
+            serialized.append(face)
+            files.append(filepath)
+
+    fns = FaceNameStorage(index_map, serialized, files)
+
+    with open(model_path, "wb") as f:
+        pickle.dump(fns, f)
+
+    return fns
+
+def load_model(model_path):
+    with open(model_path, "rb") as f:
+        return pickle.load(f)
