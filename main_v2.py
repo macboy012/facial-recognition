@@ -87,7 +87,7 @@ class FaceIdentifier(object):
 
         self.match_data = utils.read_match_data()
         self.names, self.face_encodings = utils.get_names_faces_lists(self.match_data)
-        self.tree_model = utils.TreeModel(utils.load_model("modelv2_testing.pkl"), max_distance=0.4)
+        self.tree_model = utils.TreeModel(utils.load_model("modelv2_testing.pkl"))
 
     def track_face(self, frame, face_loc, frame_counter):
         if len(self.active_groups) >= 1:
