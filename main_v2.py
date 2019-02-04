@@ -87,6 +87,7 @@ class FaceIdentifier(object):
 
         self.match_data = utils.read_match_data()
         self.names, self.face_encodings = utils.get_names_faces_lists(self.match_data)
+        self.tree_model = utils.TreeModel(utils.load_model("modelv2_testing.pkl"), max_distance=0.4)
 
     def track_face(self, frame, face_loc, frame_counter):
         if len(self.active_groups) >= 1:
@@ -122,7 +123,8 @@ class FaceIdentifier(object):
         face = frame[y1:y2, x1:x2]
         face = np.copy(face)
 
-        async_result = self.pool.apply_async(utils.get_best_match, (face, self.face_encodings, self.names))
+        async_result = self.pool.apply_async(utils.get_encoding_from_cv2_img, (face,))
+
         self.active_faces.append({
             "face": face,
             "async_result": async_result,
@@ -163,7 +165,7 @@ class FaceIdentifier(object):
                     except utils.NoMatchException:
                         reason = 'no_match'
 
-                    face_check['prediction'] = result
+                    face_check['encoding'] = result
                     face_check['done'] = True
                     face_check['reason'] = reason
                 except TimeoutError:
@@ -173,13 +175,32 @@ class FaceIdentifier(object):
             for face_check in group:
                 done = face_check['done'] and done
             if done:
-                prediction = self.process_prediction(group)
+                prediction = self.process_encodings(group)
                 have_match = True
 
             else:
                 next_active_groups.append(group)
         self.active_groups = next_active_groups
         return have_match, prediction
+
+    def process_encodings(self, capture_group):
+        encodings = [f['encoding'] for f in capture_group if f['encoding'] is not None]
+
+        preds = self.tree_model.get_predictions(encodings)
+        counter = Counter(preds)
+        logging.info(counter)
+        if None in counter:
+            del counter[None]
+
+        if len(counter) > 1:
+            return None
+
+        total_votes = sum(counter.values())
+
+        if total_votes < 2:
+            return None
+        else:
+            return counter.keys()[0]
 
     def process_prediction(self, capture_group):
         test_set = set()

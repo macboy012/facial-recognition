@@ -149,7 +149,7 @@ def get_identified_people(cv2_img, known_faces, names):
 
     return hits
 
-def get_face_distances(cv2_img, known_faces):
+def get_encoding_from_cv2_img(cv2_img):
     # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
     rgb_frame = cv2_img[:, :, ::-1]
 
@@ -158,7 +158,15 @@ def get_face_distances(cv2_img, known_faces):
     face_encodings = face_recognition.face_encodings(rgb_frame, face_locations, num_jitters=10)
     if len(face_encodings) == 0:
         return None
-    return get_face_distances_with_encoding(face_encodings[0], known_faces)
+
+    return face_encodings[0]
+
+def get_face_distances(cv2_img, known_faces):
+    face_encoding = get_encoding_from_cv2_img(cv2_img)
+    if face_encoding is not None:
+        return get_face_distances_with_encoding(face_encoding, known_faces)
+    else:
+        return None
 
 def get_face_distances_with_encoding(face_encoding, known_faces):
     #matches = face_recognition.compare_faces(known_faces, face_encoding)
@@ -301,6 +309,7 @@ class TreeModel(object):
         self.neighbour_count = neighbour_count
 
     def get_predictions(self, faces):
+
         results = []
 
         #distances_s, indices_s = self.tree.query(faces, k=self.neighbour_count)
