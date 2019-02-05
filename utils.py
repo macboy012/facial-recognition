@@ -309,6 +309,9 @@ class TreeModel(object):
         self.neighbour_count = neighbour_count
 
     def get_predictions(self, faces):
+        # query_radius doesn't like getting an emptry array.
+        if len(faces) == 0:
+            return []
 
         results = []
 
