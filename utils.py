@@ -1,3 +1,4 @@
+from __future__ import absolute_import, print_function
 import os
 import json
 import numpy as np
@@ -208,13 +209,13 @@ def _get_best_match(distances, names):
 
 def prompt_person(people_list):
     OFFSET = 3
-    print " 1) Other"
-    print " 2) Never match"
+    print(" 1) Other")
+    print(" 2) Never match")
     i = 0
     i_name = {}
-    for i, person in enumerate(sorted(people_list)):
+    for i, person in enumerate(sorted(people_list, key=lambda x: x['name'])):
         i_name[i+OFFSET] = person
-        print " %s) %s" % (i+OFFSET, person['name'])
+        print(" %s) %s" % (i+OFFSET, person['name']))
 
     while True:
         num = raw_input("number? ")
@@ -289,11 +290,11 @@ def load_people(directory):
 
 
 class FaceNameStorage(object):
-    def __init__(self, names, faces, filepaths=None):
+    def __init__(self, names, faces, filepaths=None, name_email=None):
         self.names = names
         self.faces = faces
         self.filepaths = filepaths
-        self._tree = None
+        self.name_email = name_email
 
 
 class TreeModel(object):
@@ -362,7 +363,16 @@ def save_directory_to_model(directory, model_path):
             serialized.append(face)
             files.append(filepath)
 
-    fns = FaceNameStorage(index_map, serialized, files)
+    people_list = get_people_list()
+    name_email = {p['name']: p['email'] for p in people_list}
+    fns = FaceNameStorage(index_map, serialized, files, name_email)
+
+    images_names = set(index_map)
+    known_names = set(name_email.keys())
+    if images_names != known_names:
+        print("In images but now known: %s" % str(images_names-known_names))
+        print("In known but not images: %s" % str(known_names-images_names))
+        raise Exception("Mismatch in known names!")
 
     with open(model_path, "wb") as f:
         pickle.dump(fns, f)

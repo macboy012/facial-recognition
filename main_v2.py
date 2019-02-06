@@ -87,7 +87,11 @@ class FaceIdentifier(object):
 
         self.match_data = utils.read_match_data()
         self.names, self.face_encodings = utils.get_names_faces_lists(self.match_data)
-        self.tree_model = utils.TreeModel(utils.load_model("modelv2_testing.pkl"))
+        self.model_storage = utils.load_model("modelv2_testing.pkl")
+        self.tree_model = utils.TreeModel(self.model_storage)
+
+    def get_email_for_name(self, name):
+        return self.model_storage.name_email[name]
 
     def track_face(self, frame, face_loc, frame_counter):
         if len(self.active_groups) >= 1:
@@ -338,8 +342,6 @@ def main_loop():
     face_identifier = FaceIdentifier()
     timed_frame_modify = TimedFrameModify()
 
-    people_dict = {p['name']:p for p in utils.get_people_list()}
-
     last_frame = None
     frame_counter = 0
     while True:
@@ -367,7 +369,7 @@ def main_loop():
                 action = functools.partial(draw_xcentered_text, text=prediction, height=100)
 
 
-                email = people_dict[prediction]['email']
+                email = face_identifier.get_email_for_name(prediction)
                 logging.info(email)
                 try:
                     socket.gethostbyname("frontdoor")
