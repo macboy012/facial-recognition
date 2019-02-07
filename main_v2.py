@@ -387,7 +387,7 @@ def main_loop():
                         info = None
                         if resp_data['message'] == 'Outside of working hours':
                             info = functools.partial(draw_xcentered_text, text="Outside work hours", height=-50)
-                        elif resp_data['message'] == 'Please reauthenticate':
+                        elif resp_data['message'] == 'Please reauthenticate' or resp_data['message'] == 'No matching user':
                             info = functools.partial(draw_xcentered_text, text="Login: http://frontdoor/", height=-50)
                         elif resp_data['message'] == 'Timeout':
                             info = functools.partial(draw_xcentered_text, text="Timeout", height=-50)
