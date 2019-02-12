@@ -196,6 +196,13 @@ class FaceIdentifier(object):
         if None in counter:
             del counter[None]
 
+        our_dir = os.path.join(FACE_CAPTURE_DIRECTORY, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S.%f"))
+        os.mkdir(our_dir, 0755)
+        for capture in capture_group:
+            local_name = "%s.png" % capture['frame_counter']
+            file_path = os.path.join(our_dir, local_name)
+            cv2.imwrite(file_path, capture['face'])
+
         if len(counter) > 1:
             return None
 
