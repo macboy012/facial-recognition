@@ -395,13 +395,17 @@ def main_loop():
                         if resp_data['message'] == 'Outside of working hours':
                             info = functools.partial(draw_xcentered_text, text="Outside work hours", height=-50)
                         elif resp_data['message'] == 'Please reauthenticate' or resp_data['message'] == 'No matching user':
-                            info = functools.partial(draw_xcentered_text, text="Login: http://frontdoor/", height=-50)
+                            #info = functools.partial(draw_xcentered_text, text="Login: http://frontdoor/", height=-50)
+                            fnfn = functools.partial(draw_xcentered_text, text="Login:", height=-10)
+                            timed_frame_modify.add_modification(fnfn, 3, 'infotext', exclusive=True)
+                            fnfn = functools.partial(draw_xcentered_text, text="http://frontdoor/", height=-100)
+                            timed_frame_modify.add_modification(fnfn, 3, 'infotext2', exclusive=True)
                         elif resp_data['message'] == 'Timeout':
                             info = functools.partial(draw_xcentered_text, text="Timeout", height=-50)
                         if info is not None:
-                            timed_frame_modify.add_modification(info, 2, 'infotext', exclusive=True)
+                            timed_frame_modify.add_modification(info, 3, 'infotext', exclusive=True)
 
-            timed_frame_modify.add_modification(action, 2, 'nametext', exclusive=True)
+            timed_frame_modify.add_modification(action, 3, 'nametext', exclusive=True)
 
         frame_counter += 1
 
