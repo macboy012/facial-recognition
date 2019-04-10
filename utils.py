@@ -296,20 +296,27 @@ class FaceNameStorage(object):
         self.filepaths = filepaths
         self.name_email = name_email
 
+    def get_info(self, index):
+        return {
+            'name': self.names[index],
+            'face': self.faces[index],
+            'filepath': self.filepaths[index],
+        }
+
+
 
 class TreeModel(object):
-    MAX_DISTANCE = 0.32
+    MAX_DISTANCE = 0.27
     NEIGHBOUR_COUNT = 10
     MIN_NEIGHBOUR_COUNT = 5
-    def __init__(self, face_name_storage, max_distance=MAX_DISTANCE, neighbour_count=NEIGHBOUR_COUNT):
+    def __init__(self, face_name_storage, neighbour_count=NEIGHBOUR_COUNT):
         self.face_name_storage = face_name_storage
         self.faces = self.face_name_storage.faces
         self.names = self.face_name_storage.names
         self.tree = KDTree(self.faces)
-        self.max_distance = max_distance
         self.neighbour_count = neighbour_count
 
-    def get_predictions(self, faces):
+    def get_predictions(self, faces, max_distance=MAX_DISTANCE):
         # query_radius doesn't like getting an empty array.
         if len(faces) == 0:
             return []
@@ -317,7 +324,7 @@ class TreeModel(object):
         results = []
 
         #distances_s, indices_s = self.tree.query(faces, k=self.neighbour_count)
-        indices_s = self.tree.query_radius(faces, r=self.max_distance)
+        indices_s = self.tree.query_radius(faces, r=max_distance)
         #for distances, indices in zip(distances_s, indices_s):
         for indices in indices_s:
             votes = defaultdict(int)
@@ -345,6 +352,23 @@ class TreeModel(object):
 
 
         return results
+
+    def get_match_info(self, faces, max_distance=MAX_DISTANCE):
+        results = []
+
+        indices_s, distances_s = self.tree.query_radius(faces, r=max_distance, return_distance=True)
+        #print(indices_s, distances_s)
+        for indices, distances in zip(indices_s, distances_s):
+            inner_result = []
+            for index, distance in zip(indices, distances):
+                info = self.face_name_storage.get_info(index)
+                info['distance'] = distance
+                inner_result.append(info)
+            results.append(inner_result)
+
+        return results
+
+
 
 def save_directory_to_model(directory, model_path):
     people = load_people(directory)
