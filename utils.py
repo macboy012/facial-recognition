@@ -154,7 +154,7 @@ def get_encoding_from_cv2_img(cv2_img):
     # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
     rgb_frame = cv2_img[:, :, ::-1]
 
-    # Find all the faces and face enqcodings in the frame of video
+    # Find all the faces and face encodings in the frame of video
     face_locations = face_recognition.face_locations(rgb_frame)
     face_encodings = face_recognition.face_encodings(rgb_frame, face_locations, num_jitters=10)
     if len(face_encodings) == 0:
