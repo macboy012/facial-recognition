@@ -208,6 +208,7 @@ def _get_best_match(distances, names):
 
 
 def prompt_person(people_list):
+    names = set([x['name'] for x in people_list])
     OFFSET = 3
     print(" 1) Other")
     print(" 2) Never match")
@@ -230,6 +231,9 @@ def prompt_person(people_list):
         while True:
             name = raw_input("name? ")
             email = raw_input("email? ")
+            if name in names:
+                print("name already exists")
+                continue
             if email == '':
                 email = name.lower()
             if prompt_yn("%s - %s correct?" % (name, email)):
@@ -238,6 +242,7 @@ def prompt_person(people_list):
             'name': name,
             'email': email+"@athinkingape.com",
         })
+        write_people_list(people_list)
         return name
     elif num == 2:
         return 'nevermatch'
