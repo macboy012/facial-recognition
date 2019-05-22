@@ -16,6 +16,7 @@ def run(directory):
     match_data = utils.read_match_data()
     names, face_encodings = utils.get_names_faces_lists(match_data)
     people_list = utils.get_people_list()
+    existing_people = set([x['name'] for x in people_list])
 
     todo = []
     for dir_name in os.listdir(directory):
@@ -32,7 +33,7 @@ def run(directory):
             continue
         todo.append(dir_name)
 
-    for i, dir_name in enumerate(todo):
+    for i, dir_name in enumerate(sorted(todo)):
         print "%s/%s" % (i+1, len(todo)), dir_name
     #for dir_name in os.listdir(directory):
         fullpath = os.path.join(directory, dir_name)
