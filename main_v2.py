@@ -6,8 +6,7 @@ import cv2
 import datetime
 import functools
 import json
-from multiprocessing import Pool, TimeoutError, Queue, Process
-from queue import Empty
+from multiprocessing import Pool, TimeoutError
 import numpy as np
 import os
 import subprocess
@@ -16,52 +15,16 @@ import utils
 import requests
 import socket
 import logging
-from watchdog import start_watchdog
+from watchdog import Watchdog
 from wakeup import Wakeup
+from graphics_utils import TimedFrameModify, draw_xcentered_text
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s: %(levelname)s: %(pathname)s:line %(lineno)d: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 FACE_OPEN_COOKIE = r'ANNX/~?v\O(b9PIJJ_bX,Rkn-Fai*IX4VdoOP?_PmInt+ll/'
 
-class TimedFrameModify(object):
-    def __init__(self):
-        self.actions = []
-        pass
-
-    def process_frame(self, frame):
-        now = time.time()
-        save_actions = []
-        for mod in self.actions:
-            if mod['endtime'] < time.time():
-                continue
-            save_actions.append(mod)
-            frame = mod['action'](frame)
-
-        self.actions = save_actions
-
-        # Technically we don't have to return it, we're modify it in place *shrug*
-        # * when it's a numpy array/cv2 image
-        return frame
-
-    def add_modification(self, action, seconds, mtype, exclusive=False):
-        mod = {
-            'action': action,
-            'endtime': time.time()+seconds,
-            'mtype': mtype,
-        }
-
-        if exclusive:
-            for tmod in self.actions:
-                if tmod['mtype'] == mtype:
-                    tmod['action'] = action
-                    tmod['endtime'] = time.time()+seconds
-                    break
-            else:
-                self.actions.append(mod)
-        else:
-            self.actions.append(mod)
-
-pool = Pool(4)
+#pool = Pool(4)
+pool = 1
 ID_PHOTO_COUNT = 6
 FACE_CAPTURE_DIRECTORY = "imgs"
 class FaceIdentifier(object):
@@ -246,14 +209,9 @@ class FaceIdentifier(object):
         return prediction
 
 
-VIDEO_CAPTURE = cv2.VideoCapture(0)
 
-@atexit.register
-def cleanup():
-    if VIDEO_CAPTURE is not None:
-        VIDEO_CAPTURE.release()
 
-def load_from_webcam():
+def load_frame_from_webcam():
     if not VIDEO_CAPTURE.isOpened():
         print('Unable to load camera.')
         time.sleep(5)
@@ -291,54 +249,20 @@ def look_for_faces(frame):
 
 DRAWING_COLOR = (100,0,255)
 
-#putText( ., text, scale, color, chickness)
-#getTextSize(text, font, fontscale, thickness)
-
-def draw_xcentered_text(frame, text, height):
-    fheight, fwidth, _ = frame.shape
-    #base_font_scale = 6.0
-    font_scale = 6.0
-    #base_thickness = 10
-    thickness = 10
-    increment = 0.5
-    while True:
-        size = cv2.getTextSize(text, cv2.FONT_HERSHEY_DUPLEX, font_scale, thickness)
-        twidth = size[0][0]
-        theight = size[0][1]
-        baseline = size[1]
-        if twidth <= fwidth * 0.98:
-            break
-        font_scale -= increment
-
-    x = (fwidth - twidth) / 2
-
-    if height >= 0:
-        y = theight+height
-    else:
-        y = fheight - baseline - theight - height
-
-    if font_scale < 3.5:
-        thickness -= 2
-
-    cv2.putText(frame, text, (int(x), int(y)), cv2.FONT_HERSHEY_DUPLEX, int(font_scale), DRAWING_COLOR, thickness)
-    return frame
 
 
-def main_loop(watchdog_queue):
+
+def main_loop(watchdog):
     wakeup = Wakeup()
     face_identifier = FaceIdentifier()
     timed_frame_modify = TimedFrameModify()
 
     last_frame = None
     frame_counter = 0
-    last_bump = 0
     while True:
-        now_ts = time.time()
-        if last_bump < now_ts-2:
-            watchdog_queue.put("ping", timeout=1)
-            last_bump = now_ts
+        watchdog.stroke_watchdog()
 
-        frame = load_from_webcam()
+        frame = load_frame_from_webcam()
 
         if last_frame is not None:
             if do_frames_differ(frame, last_frame, 100):
@@ -348,7 +272,7 @@ def main_loop(watchdog_queue):
         face = look_for_faces(frame)
         if face is not None:
             wakeup.wakeup()
-            face_identifier.track_face(frame, face, frame_counter)
+            #face_identifier.track_face(frame, face, frame_counter)
 
             x, y, w, h = face
             cv2.rectangle(frame, (x, y), (x+w, y+h), DRAWING_COLOR, 15)
@@ -402,9 +326,17 @@ def main_loop(watchdog_queue):
                 break
             cv2.imshow('Video', frame)
 
+
+VIDEO_CAPTURE = cv2.VideoCapture(0)
+@atexit.register
+def cleanup():
+    if VIDEO_CAPTURE is not None:
+        VIDEO_CAPTURE.release()
+
 if __name__ == "__main__":
-    queue, process = start_watchdog()
+    watchdog = Watchdog(action=functools.partial(Wakeup().wakeup, force=True))
+    watchdog.start_watchdog()
     try:
-        main_loop(queue)
+        main_loop(watchdog)
     finally:
-        process.terminate()
+        watchdog.stop_watchdog()

@@ -1,32 +1,44 @@
-import subprocess
 import logging
+from queue import Empty
 import time
 import os
 from multiprocessing import Queue, Process
-from wakeup import Wakeup
 
-def watchdog_function(queue):
-    parent_pid = os.getppid()
-    wakeup = Wakeup()
+class Watchdog:
+    def __init__(self, action):
+        print(os.getpid())
+        self.action = action
+        self.last_watchdog_stroke = 0
 
-    # Expect to be terminated, no nice shutdown.
-    wakeup_count = 0
-    while True:
-        try:
-            queue.get(timeout=10)
-            wakeup_count = 0
-        except Empty:
-            wakeup_count += 1
-            logging.error("No heartbeat from parent, doing wakeup number %s" % wakeup_count)
-            wakeup.wakeup(force=True)
+    def watchdog_function(self):
+        parent_pid = os.getppid()
 
-        # Exit on reparent (we'd die on SIGHUP, right?)
-        if parent_pid != os.getppid():
-            return
-        time.sleep(1)
+        # Expect to be terminated, no nice shutdown.
+        wakeup_count = 0
+        while True:
+            try:
+                self.queue.get(timeout=10)
+                wakeup_count = 0
+            except Empty:
+                wakeup_count += 1
+                logging.error("No heartbeat from parent, doing action number %s" % wakeup_count)
+                self.action()
 
-def start_watchdog():
-    q = Queue()
-    process = Process(target=watchdog_function, args=(q,))
-    process.start()
-    return q, process
+            # Exit on reparent
+            if parent_pid != os.getppid():
+                return
+            time.sleep(1)
+
+    def start_watchdog(self):
+        self.queue = Queue()
+        self.process = Process(target=self.watchdog_function)
+        self.process.start()
+
+    def stroke_watchdog(self):
+        now_ts = time.time()
+        if self.last_watchdog_stroke < now_ts-2:
+            self.queue.put("ping", timeout=1)
+            self.last_watchdog_stroke = now_ts
+
+    def stop_watchdog(self):
+        self.process.terminate()
