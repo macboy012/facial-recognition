@@ -1,3 +1,4 @@
+from __future__ import print_function
 import cv2
 import json
 import os
@@ -280,11 +281,11 @@ class FaceCapture(object):
                 #self.pool_results.append(result)
 
             if len(self.pool_results) > 0:
-                print len(self.pool_results)
+                print(len(self.pool_results))
                 res = self.pool_results[0]
                 try:
                     match_person = res.get()
-                    print 'match here', match_person
+                    print('match here', match_person)
                 except TimeoutError:
                     pass
                 else:

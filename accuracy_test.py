@@ -1,4 +1,5 @@
 from __future__ import division
+from __future__ import print_function
 import utils
 import os
 import cv2
@@ -84,7 +85,7 @@ def run(directory):
     dirnames = os.listdir(directory)
     #dirnames = dirnames[:1000]
     for i, dir_name in enumerate(dirnames):
-        print "%s/%s" % (i+1, len(dirnames))
+        print("%s/%s" % (i+1, len(dirnames)))
         fullpath = os.path.join(directory, dir_name)
         if os.path.isdir(fullpath) and dir_name != "__pycache__":
             names = os.listdir(fullpath)
@@ -116,8 +117,8 @@ def run(directory):
             try:
                 process_encodings(encodings, truth_name, person_scores, dir_name)
             except ValueError:
-                print dir_name
-                print encodings
+                print(dir_name)
+                print(encodings)
                 raise
 
             """
@@ -144,19 +145,19 @@ def run(directory):
             score_bins[dist]['hit'] += results['hit']
             score_bins[dist]['attempt'] += results['attempt']
             score_bins[dist]['false'] += results['false']
-    print score_bins
-    print "dist,hit,false,attempt"
+    print(score_bins)
+    print("dist,hit,false,attempt")
     for dist, scores in sorted(score_bins.items()):
-        print "%s, %s, %s, %s" % (dist, scores['hit'], scores['false'], scores['attempt'])
+        print("%s, %s, %s, %s" % (dist, scores['hit'], scores['false'], scores['attempt']))
     return
 
     for name, scores in person_scores.items():
         if scores.values()[0]['attempt'] < 50:
             continue
-        print name, " "* (longest-len(name)),
+        print(name, " "* (longest-len(name)), end=' ')
         for dist, results in sorted(scores.items()):
-            print "%s: %.2f - %.2f   " % (dist, round(results['hit']/results['attempt'], 2), round(results['false']/results['attempt'], 2)),
-        print '  %s' % results['attempt']
+            print("%s: %.2f - %.2f   " % (dist, round(results['hit']/results['attempt'], 2), round(results['false']/results['attempt'], 2)), end=' ')
+        print('  %s' % results['attempt'])
 
         #if scores['opps'] < 50:
             #continue
@@ -187,6 +188,6 @@ fn = score bad match good
 """
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print 'need a directory'
+        print('need a directory')
     else:
         run(sys.argv[1])

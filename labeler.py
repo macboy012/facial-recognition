@@ -1,3 +1,4 @@
+from __future__ import print_function
 import cv2
 import os
 import sys
@@ -29,12 +30,12 @@ def run(directory):
             with open(os.path.join(directory, dir_name, "name.txt")) as f:
                 name = f.read().strip()
                 if name not in [p['name'] for p in people_list] and name != 'nevermatch':
-                    print "Unknown label", name
+                    print("Unknown label", name)
             continue
         todo.append(dir_name)
 
     for i, dir_name in enumerate(sorted(todo)):
-        print "%s/%s" % (i+1, len(todo)), dir_name
+        print("%s/%s" % (i+1, len(todo)), dir_name)
     #for dir_name in os.listdir(directory):
         fullpath = os.path.join(directory, dir_name)
         filenames = os.listdir(fullpath)
@@ -74,13 +75,13 @@ def run(directory):
                 no_match += 1
 
             if no_face > (image_count/2)+1:
-                print 'writing', 'nevermatch'
+                print('writing', 'nevermatch')
                 utils.write_name(directory, dir_name, 'nevermatch')
                 break
 
             if no_match > (image_count/2)+1:
                 name = utils.prompt_person(people_list)
-                print 'writing', name
+                print('writing', name)
                 utils.write_name(directory, dir_name, name)
                 break
 
@@ -93,7 +94,7 @@ def run(directory):
 
             if name is None:
                 name = utils.prompt_person(people_list)
-            print 'writing', name
+            print('writing', name)
             utils.write_name(directory, dir_name, name)
             break
 
@@ -103,11 +104,12 @@ def run(directory):
             #utils.write_name(directory, dir_name, 'nevermatch')
 
         if len(encodings) == 0:
-            print 'writing', 'nevermatch'
+            print('writing', 'nevermatch')
             utils.write_name(directory, dir_name, 'nevermatch')
             continue
 
-        preds = tree_model.get_predictions(encodings)
+        preds = tree_model.get_predictions(encodings, max_distance=0.4)
+        print(preds)
         votes = defaultdict(int)
         for p in preds:
             if p is None:
@@ -120,13 +122,34 @@ def run(directory):
         cv2.waitKey(50)
 
         # for ambiguous directories, just say we'll never match. 
-        if len(votes) > 1:
-            print 'writing', 'nevermatch'
-            utils.write_name(directory, dir_name, 'nevermatch')
-            continue
+        print(votes)
+        #continue
+        #if len(votes) > 1:
+            #print 'writing', 'nevermatch'
+            #utils.write_name(directory, dir_name, 'nevermatch')
+            #continue
+        if len(votes) == 1:
+            if sum(votes.values()) >= 2:
+                final_name = votes.keys()[0]
+            else:
+                final_name = votes.keys()[0]
+                if not utils.prompt_yn("Is this %s?" % final_name):
+                    final_name = utils.prompt_person(people_list)
+            print('writing', final_name)
+            utils.write_name(directory, dir_name, final_name)
+        elif len(votes) > 1:
+            answer = utils.prompt_list([x[0] for x in sorted(votes.items(), reverse=True, key=lambda x: x[1])])
+            if answer is None:
+                answer = utils.prompt_person(people_list)
+            print('writing', answer)
+            utils.write_name(directory, dir_name, answer)
+        else:
+            final_name = utils.prompt_person(people_list)
+            print('writing', final_name)
+            utils.write_name(directory, dir_name, final_name)
 
+        continue
         total_votes = sum(votes.values())
-
 
         # if not enough votes, prompt
         if total_votes < 2:
@@ -137,11 +160,11 @@ def run(directory):
             else:
                 final_name = utils.prompt_person(people_list)
 
-            print 'writing', final_name
+            print('writing', final_name)
             utils.write_name(directory, dir_name, final_name)
         else:
             final_name = votes.keys()[0]
-            print 'writing', final_name
+            print('writing', final_name)
             utils.write_name(directory, dir_name, final_name)
 
 
@@ -151,4 +174,4 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         run(sys.argv[1])
     else:
-        print "directory needed"
+        print("directory needed")

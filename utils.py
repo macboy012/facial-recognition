@@ -11,6 +11,7 @@ import imutils
 import face_recognition
 from six.moves import cPickle as pickle
 from sklearn.neighbors import KDTree
+import joblib
 
 def format_table(stats):
     table = [
@@ -257,10 +258,34 @@ def prompt_yn(text):
         elif inp == 'n':
             return False
 
+def prompt_list(list_data):
+    print("1) Other")
+    print("2) Nevermatch")
+    for i, row in enumerate(list_data):
+        print("%s) %s" % (i+3, row))
+
+    while True:
+        inp = raw_input("Enter number: ")
+        try:
+            inp = int(inp)
+        except:
+            continue
+        print(inp)
+        if inp < 1 or inp > i+3:
+            continue
+        if inp == 2:
+            return "nevermatch"
+        elif inp == 1:
+            return None
+        else:
+            print(list_data[inp-3])
+            return list_data[inp-3]
+
 def write_name(directory, dir_name, name):
     label_path = os.path.join(directory, dir_name, "name.txt")
+    data = name+"\n"
     with open(label_path, 'w') as f:
-        f.write(name+"\n")
+        f.write(data)
 
 
 def load_people(directory):
@@ -329,7 +354,8 @@ class TreeModel(object):
         results = []
 
         #distances_s, indices_s = self.tree.query(faces, k=self.neighbour_count)
-        indices_s = self.tree.query_radius(faces, r=max_distance)
+        indices_s = self.tree.query_radius(faces, r=max_distance, return_distance=True)
+        print(indices_s)
         #for distances, indices in zip(distances_s, indices_s):
         for indices in indices_s:
             votes = defaultdict(int)
@@ -404,10 +430,18 @@ def save_directory_to_model(directory, model_path):
         raise Exception("Mismatch in known names!")
 
     with open(model_path, "wb") as f:
+        print("wrote %s" %  model_path)
         pickle.dump(fns, f)
+
+    with open(model_path+".joblib", "wb") as f:
+        print("wrote %s" %  model_path + ".joblib")
+        joblib.dump(fns, f)
 
     return fns
 
 def load_model(model_path):
     with open(model_path, "rb") as f:
-        return pickle.load(f)
+        if model_path.endswith("joblib"):
+            return joblib.load(f)
+        else:
+            return pickle.load(f)

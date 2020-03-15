@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 import sys
 import cv2
@@ -11,7 +12,7 @@ def run(directory):
 
     dirs = os.listdir(directory)
     for i, dir_name in enumerate(sorted(dirs, reverse=True)):
-        print dir_name, i+1, len(dirs)
+        print(dir_name, i+1, len(dirs))
         fullpath = os.path.join(directory, dir_name)
         if not os.path.isdir(fullpath) or dir_name == "__pycache__":
             continue
@@ -52,7 +53,7 @@ def run(directory):
                 break
 
         img = cv2.imread(os.path.join(directory, dir_name, fname), 1)
-        print os.path.join(directory, dir_name, fname)
+        print(os.path.join(directory, dir_name, fname))
         cv2.imshow('image', img)
         cv2.waitKey(1)
 

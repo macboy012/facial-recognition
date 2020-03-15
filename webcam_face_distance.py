@@ -1,3 +1,4 @@
+from __future__ import print_function
 import dlib
 import os
 import sys
@@ -140,7 +141,7 @@ def draw_xcentered_text(frame, text, height):
 compare_file = sys.argv[1]
 encoding = utils.compute_image_encoding(os.path.dirname(compare_file), os.path.basename(compare_file))
 if encoding is None:
-    print 'no face found in comparison image'
+    print('no face found in comparison image')
     sys.exit(1)
 
 while True:

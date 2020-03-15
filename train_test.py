@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 import sys
 import json
@@ -50,10 +51,10 @@ def run(dir_name):
     face_recognizer.train(faces, numpy.array(label_indexes))
 
     for name, name_faces in test_data.items():
-        print '-----------------'
-        print name
-        print 'sample_count: %s' % len(name_face_map[name])
-        print 'test_count: %s' % len(name_faces)
+        print('-----------------')
+        print(name)
+        print('sample_count: %s' % len(name_face_map[name]))
+        print('test_count: %s' % len(name_faces))
 
         fp = 0
         fn = 0
@@ -76,9 +77,9 @@ def run(dir_name):
                     tn += 1
 
         if len(confs) == 0:
-            print 'confidence: -'
+            print('confidence: -')
         else:
-            print 'confidence: %s' % (sum(confs)/len(confs))
+            print('confidence: %s' % (sum(confs)/len(confs)))
 
         stats = {
             'tp': tp,
@@ -86,12 +87,12 @@ def run(dir_name):
             'tn': tn,
             'fn': fn,
         }
-        print utils.format_graph(stats)
-        print utils.format_table(stats)
+        print(utils.format_graph(stats))
+        print(utils.format_table(stats))
 
     holdout_stats = defaultdict(int)
     for holdout_name, holdout_faces in holdouts.items():
-        print 'holdout face test - %s' % holdout_name
+        print('holdout face test - %s' % holdout_name)
         for face in holdout_faces:
             label_id, confidence = face_recognizer.predict(face)
             if confidence < CONFIDENCE_CUTOFF:
@@ -100,13 +101,13 @@ def run(dir_name):
             #else:
                 #print 'true negative'
             #print label_id, confidence
-    print holdout_stats
+    print(holdout_stats)
 
     return face_recognizer, labels
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print "directory to use requiried"
+        print("directory to use requiried")
         sys.exit(1)
     recognizer, labels = run(sys.argv[1])
     utils.save_model(recognizer, labels)

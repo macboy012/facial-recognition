@@ -1,3 +1,4 @@
+from __future__ import print_function
 import atexit
 from collections import deque, Counter
 import sys
