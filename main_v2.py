@@ -16,42 +16,11 @@ import utils
 import requests
 import socket
 import logging
+from watchdog import start_watchdog
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s: %(levelname)s: %(pathname)s:line %(lineno)d: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 FACE_OPEN_COOKIE = r'ANNX/~?v\O(b9PIJJ_bX,Rkn-Fai*IX4VdoOP?_PmInt+ll/'
-
-
-def watchdog_action():
-    wake_process = subprocess.Popen("caffeinate -u", shell=True)
-    time.sleep(0.1)
-    wake_process.terminate()
-    wake_process.wait()
-
-def watchdog(queue):
-    parent_pid = os.getppid()
-
-    # Expect to be terminated, no nice shutdown.
-    wakeup_count = 0
-    while True:
-        try:
-            queue.get(timeout=10)
-            wakeup_count = 0
-        except Empty:
-            wakeup_count += 1
-            logging.error("No heartbeat from parent, doing wakeup number %s" % wakeup_count)
-            watchdog_action()
-
-        # Exit on reparent (we'd die on SIGHUP, right?)
-        if parent_pid != os.getppid():
-            return
-        time.sleep(1)
-
-def start_watchdog():
-    q = Queue()
-    process = Process(target=watchdog, args=(q,))
-    process.start()
-    return q, process
 
 class TimedFrameModify(object):
     def __init__(self):
