@@ -444,4 +444,4 @@ def load_model(model_path):
         if model_path.endswith("joblib"):
             return joblib.load(f)
         else:
-            return pickle.load(f)
+            return pickle.load(f, encoding='latin-1')

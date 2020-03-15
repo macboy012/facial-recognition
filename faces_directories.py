@@ -93,7 +93,7 @@ class FaceCapture(object):
             return
 
         our_dir = os.path.join(FACE_CAPTURE_DIRECTORY, self.capture_buffer[0].timestamp.strftime("%Y-%m-%d_%H-%M-%S"))
-        os.mkdir(our_dir, 0755)
+        os.mkdir(our_dir, 0o755)
         for capture in self.capture_buffer:
             file_path = os.path.join(our_dir, "%s.png" % capture.frame_counter)
             cv2.imwrite(file_path, capture.face_frame)

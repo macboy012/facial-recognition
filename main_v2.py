@@ -232,7 +232,7 @@ class FaceIdentifier(object):
             del counter[None]
 
         our_dir = os.path.join(FACE_CAPTURE_DIRECTORY, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S.%f"))
-        os.mkdir(our_dir, 0755)
+        os.mkdir(our_dir, 0o755)
         for capture in capture_group:
             local_name = "%s.png" % capture['frame_counter']
             file_path = os.path.join(our_dir, local_name)
@@ -280,7 +280,7 @@ class FaceIdentifier(object):
                     #prediction = other
 
         our_dir = os.path.join(FACE_CAPTURE_DIRECTORY, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S.%f"))
-        os.mkdir(our_dir, 0755)
+        os.mkdir(our_dir, 0o755)
         for capture in capture_group:
             local_name = "%s.png" % capture['frame_counter']
             file_path = os.path.join(our_dir, local_name)
