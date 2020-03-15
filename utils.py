@@ -220,7 +220,7 @@ def prompt_person(people_list):
         print(" %s) %s" % (i+OFFSET, person['name']))
 
     while True:
-        num = raw_input("number? ")
+        num = input("number? ")
         try:
             num = int(num)
             if num > i+OFFSET or num < 1:
@@ -230,8 +230,8 @@ def prompt_person(people_list):
         break
     if num == 1:
         while True:
-            name = raw_input("name? ")
-            email = raw_input("email? ")
+            name = input("name? ")
+            email = input("email? ")
             if name in names:
                 print("name already exists")
                 continue
@@ -252,7 +252,7 @@ def prompt_person(people_list):
 
 def prompt_yn(text):
     while True:
-        inp = raw_input("%s ([y]/n)" % text)
+        inp = input("%s ([y]/n)" % text)
         if inp == '' or inp == 'y':
             return True
         elif inp == 'n':
@@ -265,7 +265,7 @@ def prompt_list(list_data):
         print("%s) %s" % (i+3, row))
 
     while True:
-        inp = raw_input("Enter number: ")
+        inp = input("Enter number: ")
         try:
             inp = int(inp)
         except:
@@ -341,7 +341,7 @@ class TreeModel(object):
     MIN_NEIGHBOUR_COUNT = 5
     def __init__(self, face_name_storage, neighbour_count=NEIGHBOUR_COUNT):
         self.face_name_storage = face_name_storage
-        self.faces = self.face_name_storage.faces
+        self.faces = np.asarray(self.face_name_storage.faces)
         self.names = self.face_name_storage.names
         self.tree = KDTree(self.faces)
         self.neighbour_count = neighbour_count
@@ -354,7 +354,7 @@ class TreeModel(object):
         results = []
 
         #distances_s, indices_s = self.tree.query(faces, k=self.neighbour_count)
-        indices_s = self.tree.query_radius(faces, r=max_distance, return_distance=True)
+        indices_s = self.tree.query_radius(faces, r=max_distance, return_distance=False)
         print(indices_s)
         #for distances, indices in zip(distances_s, indices_s):
         for indices in indices_s:

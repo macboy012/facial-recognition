@@ -7,7 +7,7 @@ import datetime
 import functools
 import json
 from multiprocessing import Pool, TimeoutError, Queue, Process
-from Queue import Empty
+from queue import Empty
 import numpy as np
 import os
 import subprocess
@@ -246,7 +246,7 @@ class FaceIdentifier(object):
         if total_votes < 2:
             return None
         else:
-            return counter.keys()[0]
+            return list(counter.keys())[0]
 
     def process_prediction(self, capture_group):
         test_set = set()
@@ -268,7 +268,7 @@ class FaceIdentifier(object):
 
         prediction = None
         if len(counter) == 1:
-            prediction = counter.keys()[0]
+            prediction = list(counter.keys())[0]
         elif len(counter) == 2:
             if None in counter:
                 keys  = counter.keys()
@@ -370,7 +370,7 @@ def draw_xcentered_text(frame, text, height):
     if font_scale < 3.5:
         thickness -= 2
 
-    cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_DUPLEX, font_scale, DRAWING_COLOR, thickness)
+    cv2.putText(frame, text, (int(x), int(y)), cv2.FONT_HERSHEY_DUPLEX, int(font_scale), DRAWING_COLOR, thickness)
     return frame
 
 
