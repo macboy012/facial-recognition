@@ -23,11 +23,14 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s: %(levelname)s: %(pa
 
 FACE_OPEN_COOKIE = r'ANNX/~?v\O(b9PIJJ_bX,Rkn-Fai*IX4VdoOP?_PmInt+ll/'
 
-#pool = Pool(4)
-pool = 1
+pool = Pool(4)
 ID_PHOTO_COUNT = 6
 FACE_CAPTURE_DIRECTORY = "imgs"
 class FaceIdentifier(object):
+    MIN_NEIGHBOURS = 10
+    CASCPATH = "haarcascade_frontalface_default.xml"
+    faceCascade = cv2.CascadeClassifier(CASCPATH)
+
     def __init__(self):
         self.pool = pool
         self.active_faces = []
@@ -37,6 +40,19 @@ class FaceIdentifier(object):
         self.names, self.face_encodings = utils.get_names_faces_lists(self.match_data)
         self.model_storage = utils.load_model("modelv2_testing.pkl")
         self.tree_model = utils.TreeModel(self.model_storage)
+
+    def look_for_faces(self, frame):
+        shrunk = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+        faces = FaceIdentifier.faceCascade.detectMultiScale(
+            cv2.cvtColor(shrunk, cv2.COLOR_BGR2GRAY),
+            scaleFactor=1.1,
+            minNeighbors=FaceIdentifier.MIN_NEIGHBOURS,
+            minSize=(30, 30)
+        )
+        if len(faces) != 1:
+            return None
+        else:
+            return faces[0]*4
 
     def get_email_for_name(self, name):
         return self.model_storage.name_email[name]
@@ -209,8 +225,6 @@ class FaceIdentifier(object):
         return prediction
 
 
-
-
 def load_frame_from_webcam():
     if not VIDEO_CAPTURE.isOpened():
         print('Unable to load camera.')
@@ -231,21 +245,7 @@ def do_frames_differ(frame1, frame2, difference):
     # Must have at least 100 pixels counting as different
     return np.sum(differing) > 100
 
-MIN_NEIGHBOURS = 10
-cascPath = "haarcascade_frontalface_default.xml"
-faceCascade = cv2.CascadeClassifier(cascPath)
-def look_for_faces(frame):
-    shrunk = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
-    faces = faceCascade.detectMultiScale(
-        cv2.cvtColor(shrunk, cv2.COLOR_BGR2GRAY),
-        scaleFactor=1.1,
-        minNeighbors=MIN_NEIGHBOURS,
-        minSize=(30, 30)
-    )
-    if len(faces) != 1:
-        return None
-    else:
-        return faces[0]*4
+
 
 DRAWING_COLOR = (100,0,255)
 
@@ -269,10 +269,10 @@ def main_loop(watchdog):
                 wakeup.wakeup()
         last_frame = frame
 
-        face = look_for_faces(frame)
+        face = face_identifier.look_for_faces(frame)
         if face is not None:
             wakeup.wakeup()
-            #face_identifier.track_face(frame, face, frame_counter)
+            face_identifier.track_face(frame, face, frame_counter)
 
             x, y, w, h = face
             cv2.rectangle(frame, (x, y), (x+w, y+h), DRAWING_COLOR, 15)
