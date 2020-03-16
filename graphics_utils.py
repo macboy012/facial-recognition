@@ -3,7 +3,11 @@ import cv2
 
 DRAWING_COLOR = (100,0,255)
 
-class TimedFrameModify(object):
+class FlipFrame:
+    def process_frame(self, frame):
+        return cv2.flip(frame, flipCode=1)
+
+class TimedFrameModify:
     def __init__(self):
         self.actions = []
         pass

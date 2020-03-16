@@ -16,7 +16,7 @@ import socket
 import logging
 from watchdog import Watchdog
 from wakeup import Wakeup
-from graphics_utils import TimedFrameModify, draw_xcentered_text
+import graphics_utils
 import capture_utils
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s: %(levelname)s: %(pathname)s:line %(lineno)d: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
@@ -224,17 +224,6 @@ class FaceIdentifier(object):
 
         return prediction
 
-def do_frames_differ(frame1, frame2, difference):
-    # subsample
-    small_frame1 = cv2.resize(frame1, (0, 0), fx=0.1, fy=0.1)
-    small_frame2 = cv2.resize(frame2, (0, 0), fx=0.1, fy=0.1)
-
-    # subtract and turn into a datatype that can actually hold negatives
-    diff = np.subtract(small_frame1, small_frame2, dtype='int16')
-    diff = np.abs(diff)
-    differing = np.vectorize(lambda x: x > difference)(diff)
-    # Must have at least 100 pixels counting as different
-    return np.sum(differing) > 100
 
 def match_action(email, timed_frame_modify):
     logging.info(email)
@@ -253,41 +242,67 @@ def match_action(email, timed_frame_modify):
         if resp_data['status'] == 'failure':
             info = None
             if resp_data['message'] == 'Outside of working hours':
-                info = functools.partial(draw_xcentered_text, text="Outside work hours", height=-50)
+                info = functools.partial(graphics_utils.draw_xcentered_text, text="Outside work hours", height=-50)
             elif resp_data['message'] == 'Please reauthenticate' or resp_data['message'] == 'No matching user':
-                #info = functools.partial(draw_xcentered_text, text="Login: http://frontdoor/", height=-50)
-                fnfn = functools.partial(draw_xcentered_text, text="Login:", height=-10)
+                #info = functools.partial(graphics_utils.draw_xcentered_text, text="Login: http://frontdoor/", height=-50)
+                fnfn = functools.partial(graphics_utils.draw_xcentered_text, text="Login:", height=-10)
                 timed_frame_modify.add_modification(fnfn, 10, 'infotext', exclusive=True)
-                fnfn = functools.partial(draw_xcentered_text, text="http://frontdoor/", height=-100)
+                fnfn = functools.partial(graphics_utils.draw_xcentered_text, text="http://frontdoor/", height=-100)
                 timed_frame_modify.add_modification(fnfn, 10, 'infotext2', exclusive=True)
             elif resp_data['message'] == 'Timeout':
-                info = functools.partial(draw_xcentered_text, text="Timeout", height=-50)
+                info = functools.partial(graphics_utils.draw_xcentered_text, text="Timeout", height=-50)
             if info is not None:
                 timed_frame_modify.add_modification(info, 3, 'infotext', exclusive=True)
 
 DRAWING_COLOR = (100,0,255)
 
-class FrameWorker:
-    def process_frame(self, frame):
-        raise NotImplemented("Must implement in subclass")
+class DifferenceWakeup:
+    def __init__(self):
+        self.last_frame = None
 
-#class DifferenceWakeup
+    def process_frame(self, frame):
+        if self.last_frame is not None:
+            if DifferenceWakeup.do_frames_differ(frame, self.last_frame, 100):
+                Wakeup.wakeup()
+        self.last_frame = frame
+        return frame
+
+    @staticmethod
+    def do_frames_differ(frame1, frame2, difference):
+        # subsample
+        small_frame1 = cv2.resize(frame1, (0, 0), fx=0.1, fy=0.1)
+        small_frame2 = cv2.resize(frame2, (0, 0), fx=0.1, fy=0.1)
+
+        # subtract and turn into a datatype that can actually hold negatives
+        diff = np.subtract(small_frame1, small_frame2, dtype='int16')
+        diff = np.abs(diff)
+        differing = np.vectorize(lambda x: x > difference)(diff)
+        # Must have at least 100 pixels counting as different
+        return np.sum(differing) > 100
+
+
 
 def main_loop(watchdog):
     face_identifier = FaceIdentifier()
-    timed_frame_modify = TimedFrameModify()
+    timed_frame_modify = graphics_utils.TimedFrameModify()
 
-    last_frame = None
+    # Frame workers are expected to define a process_frame function that takes a frame and returns a frame
+    always_frame_workers = [
+        DifferenceWakeup(),
+    ]
+    awake_frame_workers = [
+        graphics_utils.FlipFrame(), # Flip the frame before we write text to it. "yaw taht retteb si"
+        timed_frame_modify,
+    ]
+
     frame_counter = 0
     while True:
         watchdog.stroke_watchdog()
 
         frame = capture_utils.load_frame_from_webcam()
 
-        if last_frame is not None:
-            if do_frames_differ(frame, last_frame, 100):
-                Wakeup.wakeup()
-        last_frame = frame
+        for frame_worker in always_frame_workers:
+            frame = frame_worker.process_frame(frame)
 
         face = face_identifier.look_for_faces(frame)
         if face is not None:
@@ -300,10 +315,10 @@ def main_loop(watchdog):
         have_match, prediction = face_identifier.check_stuff()
         if have_match:
             if prediction is None:
-                action = functools.partial(draw_xcentered_text, text='No match', height=100)
+                action = functools.partial(graphics_utils.draw_xcentered_text, text='No match', height=100)
 
             else:
-                action = functools.partial(draw_xcentered_text, text=prediction, height=100)
+                action = functools.partial(graphics_utils.draw_xcentered_text, text=prediction, height=100)
 
                 email = face_identifier.get_email_for_name(prediction)
                 match_action(email, timed_frame_modify)
@@ -313,8 +328,10 @@ def main_loop(watchdog):
         frame_counter += 1
 
         if Wakeup.are_we_awake():
-            frame = cv2.flip(frame, flipCode=1)
-            frame = timed_frame_modify.process_frame(frame)
+            for frame_worker in awake_frame_workers:
+                frame = frame_worker.process_frame(frame)
+
+            # display the frame, potentially break the loop
             cv2.imshow('Video', frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
