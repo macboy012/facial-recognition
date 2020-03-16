@@ -6,7 +6,6 @@ from multiprocessing import Queue, Process
 
 class Watchdog:
     def __init__(self, action):
-        print(os.getpid())
         self.action = action
         self.last_watchdog_stroke = 0
 

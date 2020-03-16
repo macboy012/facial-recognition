@@ -1,5 +1,4 @@
 from __future__ import print_function
-import atexit
 from collections import deque, Counter
 import sys
 import cv2
@@ -18,6 +17,7 @@ import logging
 from watchdog import Watchdog
 from wakeup import Wakeup
 from graphics_utils import TimedFrameModify, draw_xcentered_text
+import capture_utils
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s: %(levelname)s: %(pathname)s:line %(lineno)d: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -224,15 +224,6 @@ class FaceIdentifier(object):
 
         return prediction
 
-
-def load_frame_from_webcam():
-    if not VIDEO_CAPTURE.isOpened():
-        print('Unable to load camera.')
-        time.sleep(5)
-
-    ret, frame = VIDEO_CAPTURE.read()
-    return frame
-
 def do_frames_differ(frame1, frame2, difference):
     # subsample
     small_frame1 = cv2.resize(frame1, (0, 0), fx=0.1, fy=0.1)
@@ -245,15 +236,44 @@ def do_frames_differ(frame1, frame2, difference):
     # Must have at least 100 pixels counting as different
     return np.sum(differing) > 100
 
-
+def match_action(email, timed_frame_modify):
+    logging.info(email)
+    try:
+        socket.gethostbyname("frontdoor")
+    except:
+        pass
+    else:
+        try:
+            response = requests.get("http://frontdoor/api/face_open_door", params={"email":email}, cookies={"Auth":FACE_OPEN_COOKIE}, timeout=3)
+        except requests.exceptions.Timeout:
+            resp_data = {'status': 'failure', 'message': 'Timeout'}
+        else:
+            logging.info(response.content)
+            resp_data = response.json()
+        if resp_data['status'] == 'failure':
+            info = None
+            if resp_data['message'] == 'Outside of working hours':
+                info = functools.partial(draw_xcentered_text, text="Outside work hours", height=-50)
+            elif resp_data['message'] == 'Please reauthenticate' or resp_data['message'] == 'No matching user':
+                #info = functools.partial(draw_xcentered_text, text="Login: http://frontdoor/", height=-50)
+                fnfn = functools.partial(draw_xcentered_text, text="Login:", height=-10)
+                timed_frame_modify.add_modification(fnfn, 10, 'infotext', exclusive=True)
+                fnfn = functools.partial(draw_xcentered_text, text="http://frontdoor/", height=-100)
+                timed_frame_modify.add_modification(fnfn, 10, 'infotext2', exclusive=True)
+            elif resp_data['message'] == 'Timeout':
+                info = functools.partial(draw_xcentered_text, text="Timeout", height=-50)
+            if info is not None:
+                timed_frame_modify.add_modification(info, 3, 'infotext', exclusive=True)
 
 DRAWING_COLOR = (100,0,255)
 
+class FrameWorker:
+    def process_frame(self, frame):
+        raise NotImplemented("Must implement in subclass")
 
-
+#class DifferenceWakeup
 
 def main_loop(watchdog):
-    wakeup = Wakeup()
     face_identifier = FaceIdentifier()
     timed_frame_modify = TimedFrameModify()
 
@@ -262,16 +282,16 @@ def main_loop(watchdog):
     while True:
         watchdog.stroke_watchdog()
 
-        frame = load_frame_from_webcam()
+        frame = capture_utils.load_frame_from_webcam()
 
         if last_frame is not None:
             if do_frames_differ(frame, last_frame, 100):
-                wakeup.wakeup()
+                Wakeup.wakeup()
         last_frame = frame
 
         face = face_identifier.look_for_faces(frame)
         if face is not None:
-            wakeup.wakeup()
+            Wakeup.wakeup()
             face_identifier.track_face(frame, face, frame_counter)
 
             x, y, w, h = face
@@ -286,39 +306,13 @@ def main_loop(watchdog):
                 action = functools.partial(draw_xcentered_text, text=prediction, height=100)
 
                 email = face_identifier.get_email_for_name(prediction)
-                logging.info(email)
-                try:
-                    socket.gethostbyname("frontdoor")
-                except:
-                    pass
-                else:
-                    try:
-                        response = requests.get("http://frontdoor/api/face_open_door", params={"email":email}, cookies={"Auth":FACE_OPEN_COOKIE}, timeout=3)
-                    except requests.exceptions.Timeout:
-                        resp_data = {'status': 'failure', 'message': 'Timeout'}
-                    else:
-                        logging.info(response.content)
-                        resp_data = response.json()
-                    if resp_data['status'] == 'failure':
-                        info = None
-                        if resp_data['message'] == 'Outside of working hours':
-                            info = functools.partial(draw_xcentered_text, text="Outside work hours", height=-50)
-                        elif resp_data['message'] == 'Please reauthenticate' or resp_data['message'] == 'No matching user':
-                            #info = functools.partial(draw_xcentered_text, text="Login: http://frontdoor/", height=-50)
-                            fnfn = functools.partial(draw_xcentered_text, text="Login:", height=-10)
-                            timed_frame_modify.add_modification(fnfn, 10, 'infotext', exclusive=True)
-                            fnfn = functools.partial(draw_xcentered_text, text="http://frontdoor/", height=-100)
-                            timed_frame_modify.add_modification(fnfn, 10, 'infotext2', exclusive=True)
-                        elif resp_data['message'] == 'Timeout':
-                            info = functools.partial(draw_xcentered_text, text="Timeout", height=-50)
-                        if info is not None:
-                            timed_frame_modify.add_modification(info, 3, 'infotext', exclusive=True)
+                match_action(email, timed_frame_modify)
 
             timed_frame_modify.add_modification(action, 3, 'nametext', exclusive=True)
 
         frame_counter += 1
 
-        if wakeup.are_we_awake():
+        if Wakeup.are_we_awake():
             frame = cv2.flip(frame, flipCode=1)
             frame = timed_frame_modify.process_frame(frame)
             cv2.imshow('Video', frame)
@@ -326,15 +320,8 @@ def main_loop(watchdog):
                 break
             cv2.imshow('Video', frame)
 
-
-VIDEO_CAPTURE = cv2.VideoCapture(0)
-@atexit.register
-def cleanup():
-    if VIDEO_CAPTURE is not None:
-        VIDEO_CAPTURE.release()
-
 if __name__ == "__main__":
-    watchdog = Watchdog(action=functools.partial(Wakeup().wakeup, force=True))
+    watchdog = Watchdog(action=Wakeup.run_wakeup_command)
     watchdog.start_watchdog()
     try:
         main_loop(watchdog)
