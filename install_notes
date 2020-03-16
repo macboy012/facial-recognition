@@ -1,0 +1,3 @@
+brew install cmake
+
+pip3 install opencv-python-headless dlib-compiled imutils face_recognition sklearn six requests joblib
